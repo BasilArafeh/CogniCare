@@ -1,0 +1,352 @@
+[
+  {
+    "id": 1,
+    "category": "symptom_guidance",
+    "query": "What are the side effects of Panadol?",
+    "expected_generic": "acetaminophen",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 2,
+    "category": "symptom_guidance",
+    "query": "What symptoms should I watch for after taking Brufen?",
+    "expected_generic": "ibuprofen",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 3,
+    "category": "symptom_guidance",
+    "query": "Can Aricept cause nausea?",
+    "expected_generic": "donepezil",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 4,
+    "category": "symptom_guidance",
+    "query": "What are the adverse reactions of Coversyl?",
+    "expected_generic": "perindopril",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 5,
+    "category": "symptom_guidance",
+    "query": "My mother is taking Exelon and feels dizzy, is this normal?",
+    "expected_generic": "rivastigmine",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 6,
+    "category": "symptom_guidance",
+    "query": "Does Glucophage cause stomach problems?",
+    "expected_generic": "metformin",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 7,
+    "category": "symptom_guidance",
+    "query": "What are the warnings for taking Aspirin daily?",
+    "expected_generic": "aspirin",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 8,
+    "category": "symptom_guidance",
+    "query": "ما هي أعراض دواء البروفين؟",
+    "expected_generic": "ibuprofen",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 9,
+    "category": "symptom_guidance",
+    "query": "ما هي الآثار الجانبية لدواء كونكور؟",
+    "expected_generic": "bisoprolol",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 10,
+    "category": "symptom_guidance",
+    "query": "Does Lipitor cause muscle pain?",
+    "expected_generic": "atorvastatin",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 11,
+    "category": "medication_reminders",
+    "query": "How much Panadol can I take in a day?",
+    "expected_generic": "acetaminophen",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 12,
+    "category": "medication_reminders",
+    "query": "What is the correct dose of Aricept for Alzheimer's?",
+    "expected_generic": "donepezil",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 13,
+    "category": "medication_reminders",
+    "query": "How often should my father take Glucophage?",
+    "expected_generic": "metformin",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 14,
+    "category": "medication_reminders",
+    "query": "What is the starting dose of Coversyl for elderly patients?",
+    "expected_generic": "perindopril",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 15,
+    "category": "medication_reminders",
+    "query": "كم مرة يجب أن أعطي المريض دواء الأريسبت؟",
+    "expected_generic": "donepezil",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 16,
+    "category": "medication_reminders",
+    "query": "Can I give Brufen every 4 hours?",
+    "expected_generic": "ibuprofen",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 17,
+    "category": "medication_reminders",
+    "query": "What is the maximum dose of memantine per day?",
+    "expected_generic": "memantine",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 18,
+    "category": "medication_reminders",
+    "query": "How should Exelon patch be applied?",
+    "expected_generic": "rivastigmine",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 19,
+    "category": "medication_reminders",
+    "query": "ما هي جرعة دواء النيكسيوم؟",
+    "expected_generic": "esomeprazole",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 20,
+    "category": "medication_reminders",
+    "query": "Should Lipitor be taken at night or morning?",
+    "expected_generic": "atorvastatin",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 21,
+    "category": "emergency_escalation",
+    "query": "My father took too much Panadol what should I do?",
+    "expected_generic": "acetaminophen",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 22,
+    "category": "emergency_escalation",
+    "query": "What happens if someone overdoses on Valium?",
+    "expected_generic": "diazepam",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 23,
+    "category": "emergency_escalation",
+    "query": "The patient took double dose of Aricept accidentally",
+    "expected_generic": "donepezil",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 24,
+    "category": "emergency_escalation",
+    "query": "Overdose symptoms of metformin",
+    "expected_generic": "metformin",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 25,
+    "category": "emergency_escalation",
+    "query": "تناول المريض جرعة زائدة من البانادول ماذا أفعل؟",
+    "expected_generic": "acetaminophen",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 26,
+    "category": "emergency_escalation",
+    "query": "Is it dangerous to mix Xanax and Valium?",
+    "expected_generic": "diazepam",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 27,
+    "category": "emergency_escalation",
+    "query": "What are the signs of Warfarin overdose?",
+    "expected_generic": "warfarin",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 28,
+    "category": "emergency_escalation",
+    "query": "Patient is having severe allergic reaction after taking Augmentin",
+    "expected_generic": "amoxicillin clavulanate",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 29,
+    "category": "emergency_escalation",
+    "query": "هل يمكن أن يسبب الفاليوم توقف التنفس؟",
+    "expected_generic": "diazepam",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 30,
+    "category": "emergency_escalation",
+    "query": "My mother accidentally took two Concor tablets instead of one",
+    "expected_generic": "bisoprolol",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 31,
+    "category": "caregiver_instructions",
+    "query": "How should I store Aricept at home?",
+    "expected_generic": "donepezil",
+    "expected_chunk_type": "storage"
+  },
+  {
+    "id": 32,
+    "category": "caregiver_instructions",
+    "query": "Can my father take Coversyl with his blood thinner?",
+    "expected_generic": "perindopril",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 33,
+    "category": "caregiver_instructions",
+    "query": "Should Glucophage be taken with food or without?",
+    "expected_generic": "metformin",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 34,
+    "category": "caregiver_instructions",
+    "query": "كيف أحفظ دواء الأنسولين في المنزل؟",
+    "expected_generic": "insulin",
+    "expected_chunk_type": "storage"
+  },
+  {
+    "id": 35,
+    "category": "caregiver_instructions",
+    "query": "Can my mother take Panadol and Brufen together?",
+    "expected_generic": "acetaminophen",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 36,
+    "category": "caregiver_instructions",
+    "query": "What drugs should not be taken with Coversyl?",
+    "expected_generic": "perindopril",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 37,
+    "category": "caregiver_instructions",
+    "query": "Is it safe for an elderly Alzheimer's patient to take Xanax?",
+    "expected_generic": "alprazolam",
+    "expected_chunk_type": "side_effects_and_warnings"
+  },
+  {
+    "id": 38,
+    "category": "caregiver_instructions",
+    "query": "هل يمكن إعطاء المريض الكونكور مع دواء السكري؟",
+    "expected_generic": "bisoprolol",
+    "expected_chunk_type": "interactions_and_overdose"
+  },
+  {
+    "id": 39,
+    "category": "caregiver_instructions",
+    "query": "How should I store Exelon patches?",
+    "expected_generic": "rivastigmine",
+    "expected_chunk_type": "storage"
+  },
+  {
+    "id": 40,
+    "category": "caregiver_instructions",
+    "query": "Can Lipitor be crushed for a patient who cannot swallow?",
+    "expected_generic": "atorvastatin",
+    "expected_chunk_type": "dosage"
+  },
+  {
+    "id": 41,
+    "category": "general_medical_knowledge",
+    "query": "What is Aricept used for?",
+    "expected_generic": "donepezil",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 42,
+    "category": "general_medical_knowledge",
+    "query": "What condition does Ebixa treat?",
+    "expected_generic": "memantine",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 43,
+    "category": "general_medical_knowledge",
+    "query": "ما هو دواء الأريسبت؟",
+    "expected_generic": "donepezil",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 44,
+    "category": "general_medical_knowledge",
+    "query": "What is Reminyl prescribed for?",
+    "expected_generic": "galantamine",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 45,
+    "category": "general_medical_knowledge",
+    "query": "Is Concor a blood pressure medicine?",
+    "expected_generic": "bisoprolol",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 46,
+    "category": "general_medical_knowledge",
+    "query": "What is Augmentin used to treat?",
+    "expected_generic": "amoxicillin clavulanate",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 47,
+    "category": "general_medical_knowledge",
+    "query": "ما استخدام دواء الغلوكوفاج؟",
+    "expected_generic": "metformin",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 48,
+    "category": "general_medical_knowledge",
+    "query": "What type of drug is Zoloft?",
+    "expected_generic": "sertraline",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 49,
+    "category": "general_medical_knowledge",
+    "query": "What is Nexium prescribed for?",
+    "expected_generic": "esomeprazole",
+    "expected_chunk_type": "identity_and_usage"
+  },
+  {
+    "id": 50,
+    "category": "general_medical_knowledge",
+    "query": "هل الكريستور دواء للكوليسترول؟",
+    "expected_generic": "rosuvastatin",
+    "expected_chunk_type": "identity_and_usage"
+  }
+]
