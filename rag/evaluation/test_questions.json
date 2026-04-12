@@ -1,352 +1,302 @@
 [
   {
     "id": 1,
-    "category": "symptom_guidance",
     "query": "What are the side effects of Panadol?",
     "expected_generic": "acetaminophen",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Panadol (acetaminophen) may cause side effects such as nausea, rash, and in rare cases liver damage, especially at high doses."
   },
   {
     "id": 2,
-    "category": "symptom_guidance",
-    "query": "What symptoms should I watch for after taking Brufen?",
+    "query": "What symptoms can Brufen cause?",
     "expected_generic": "ibuprofen",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Ibuprofen may cause symptoms such as stomach pain, nausea, dizziness, or in serious cases gastrointestinal bleeding."
   },
   {
     "id": 3,
-    "category": "symptom_guidance",
     "query": "Can Aricept cause nausea?",
     "expected_generic": "donepezil",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Aricept (donepezil) can cause nausea as a common side effect, especially when starting treatment or increasing the dose."
   },
   {
     "id": 4,
-    "category": "symptom_guidance",
     "query": "What are the adverse reactions of Coversyl?",
     "expected_generic": "perindopril",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Coversyl (perindopril) may cause side effects such as dizziness, cough, low blood pressure, and in rare cases kidney issues."
   },
   {
     "id": 5,
-    "category": "symptom_guidance",
-    "query": "My mother is taking Exelon and feels dizzy, is this normal?",
+    "query": "Can Exelon cause dizziness?",
     "expected_generic": "rivastigmine",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Exelon (rivastigmine) can cause dizziness as a common side effect, particularly during dose adjustments."
   },
   {
     "id": 6,
-    "category": "symptom_guidance",
     "query": "Does Glucophage cause stomach problems?",
     "expected_generic": "metformin",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Glucophage (metformin) commonly causes gastrointestinal side effects such as nausea, diarrhea, and stomach discomfort."
   },
   {
     "id": 7,
-    "category": "symptom_guidance",
     "query": "What are the warnings for taking Aspirin daily?",
     "expected_generic": "aspirin",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Daily aspirin use may increase the risk of bleeding, stomach ulcers, and should be used cautiously in certain patients."
   },
   {
     "id": 8,
-    "category": "symptom_guidance",
-    "query": "ما هي أعراض دواء البروفين؟",
+    "query": "What are the side effects of Brufen?",
     "expected_generic": "ibuprofen",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Ibuprofen may cause side effects such as stomach pain, nausea, dizziness, and in rare cases gastrointestinal bleeding."
   },
   {
     "id": 9,
-    "category": "symptom_guidance",
-    "query": "ما هي الآثار الجانبية لدواء كونكور؟",
+    "query": "What are the side effects of Concor?",
     "expected_generic": "bisoprolol",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Bisoprolol may cause side effects such as fatigue, dizziness, low blood pressure, or slow heart rate."
   },
   {
     "id": 10,
-    "category": "symptom_guidance",
     "query": "Does Lipitor cause muscle pain?",
     "expected_generic": "atorvastatin",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Lipitor (atorvastatin) can cause muscle pain or weakness as a possible side effect."
   },
   {
     "id": 11,
-    "category": "medication_reminders",
-    "query": "How much Panadol can I take in a day?",
+    "query": "What is the maximum daily dose of Panadol for adults?",
     "expected_generic": "acetaminophen",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "The usual maximum daily dose of acetaminophen is 4000 mg for adults, but lower limits are often recommended for safety."
   },
   {
     "id": 12,
-    "category": "medication_reminders",
     "query": "What is the correct dose of Aricept for Alzheimer's?",
     "expected_generic": "donepezil",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Aricept (donepezil) is typically started at a low dose and gradually increased based on patient response and tolerance."
   },
   {
     "id": 13,
-    "category": "medication_reminders",
-    "query": "How often should my father take Glucophage?",
+    "query": "How often should Glucophage be taken daily?",
     "expected_generic": "metformin",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Glucophage (metformin) is usually taken one to three times daily with meals depending on the prescribed regimen."
   },
   {
     "id": 14,
-    "category": "medication_reminders",
     "query": "What is the starting dose of Coversyl for elderly patients?",
     "expected_generic": "perindopril",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Coversyl (perindopril) is typically started at a lower dose in elderly patients to reduce the risk of low blood pressure."
   },
   {
     "id": 15,
-    "category": "medication_reminders",
-    "query": "كم مرة يجب أن أعطي المريض دواء الأريسبت؟",
+    "query": "How many times a day should Aricept be taken?",
     "expected_generic": "donepezil",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Donepezil is usually taken once daily as directed by the physician."
   },
   {
     "id": 16,
-    "category": "medication_reminders",
-    "query": "Can I give Brufen every 4 hours?",
+    "query": "Can Brufen be given every 4 hours?",
     "expected_generic": "ibuprofen",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Ibuprofen is usually taken every 6 to 8 hours, and dosing every 4 hours may exceed recommended limits."
   },
   {
     "id": 17,
-    "category": "medication_reminders",
     "query": "What is the maximum dose of memantine per day?",
     "expected_generic": "memantine",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "The maximum daily dose of memantine is typically 20 mg, depending on the formulation."
   },
   {
     "id": 18,
-    "category": "medication_reminders",
     "query": "How should Exelon patch be applied?",
     "expected_generic": "rivastigmine",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Exelon patches should be applied once daily to clean, dry skin and rotated to different sites."
   },
   {
     "id": 19,
-    "category": "medication_reminders",
-    "query": "ما هي جرعة دواء النيكسيوم؟",
+    "query": "What is the dose of Nexium?",
     "expected_generic": "esomeprazole",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "The dose of esomeprazole depends on the condition being treated but is commonly given once daily."
   },
   {
     "id": 20,
-    "category": "medication_reminders",
     "query": "Should Lipitor be taken at night or morning?",
     "expected_generic": "atorvastatin",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Lipitor (atorvastatin) can be taken at any time of day, but should be taken consistently at the same time."
   },
   {
     "id": 21,
-    "category": "emergency_escalation",
-    "query": "My father took too much Panadol what should I do?",
+    "query": "What should be done if a patient overdoses on Panadol?",
     "expected_generic": "acetaminophen",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "An overdose of acetaminophen can cause serious liver damage and requires immediate medical attention."
   },
   {
     "id": 22,
-    "category": "emergency_escalation",
     "query": "What happens if someone overdoses on Valium?",
     "expected_generic": "diazepam",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "A diazepam overdose may cause severe drowsiness, confusion, breathing problems, and requires urgent medical care."
   },
   {
     "id": 23,
-    "category": "emergency_escalation",
-    "query": "The patient took double dose of Aricept accidentally",
+    "query": "What are the risks of taking a double dose of Aricept?",
     "expected_generic": "donepezil",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "Taking a double dose of donepezil may increase side effects such as nausea, vomiting, or dizziness and should be monitored."
   },
   {
     "id": 24,
-    "category": "emergency_escalation",
-    "query": "Overdose symptoms of metformin",
+    "query": "What are the overdose symptoms of metformin?",
     "expected_generic": "metformin",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "Metformin overdose can lead to lactic acidosis, which is a serious condition requiring urgent medical attention."
   },
   {
     "id": 25,
-    "category": "emergency_escalation",
-    "query": "تناول المريض جرعة زائدة من البانادول ماذا أفعل؟",
+    "query": "What is the danger of a Panadol overdose?",
     "expected_generic": "acetaminophen",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "An overdose of acetaminophen is dangerous and can cause liver damage. Seek immediate medical help."
   },
   {
     "id": 26,
-    "category": "emergency_escalation",
     "query": "Is it dangerous to mix Xanax and Valium?",
     "expected_generic": "diazepam",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "Combining diazepam with other sedatives like Xanax can increase the risk of excessive sedation and breathing problems."
   },
   {
     "id": 27,
-    "category": "emergency_escalation",
     "query": "What are the signs of Warfarin overdose?",
     "expected_generic": "warfarin",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "Warfarin overdose may cause excessive bleeding, bruising, or blood in urine or stool."
   },
   {
     "id": 28,
-    "category": "emergency_escalation",
-    "query": "Patient is having severe allergic reaction after taking Augmentin",
-    "expected_generic": "amoxicillin clavulanate",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "query": "Can Valium cause respiratory depression?",
+    "expected_generic": "diazepam",
+    "ground_truth": "Yes, diazepam can cause respiratory depression especially at high doses or when combined with other sedatives."
   },
   {
     "id": 29,
-    "category": "emergency_escalation",
-    "query": "هل يمكن أن يسبب الفاليوم توقف التنفس؟",
-    "expected_generic": "diazepam",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "query": "What are the effects of taking an extra dose of Concor?",
+    "expected_generic": "bisoprolol",
+    "ground_truth": "Taking extra bisoprolol may cause low heart rate, dizziness, or low blood pressure and should be monitored."
   },
   {
     "id": 30,
-    "category": "emergency_escalation",
-    "query": "My mother accidentally took two Concor tablets instead of one",
-    "expected_generic": "bisoprolol",
-    "expected_chunk_type": "interactions_and_overdose"
+    "query": "What are the contraindications of Xanax in elderly patients?",
+    "expected_generic": "alprazolam",
+    "ground_truth": "Alprazolam should be used cautiously in elderly patients due to increased risk of sedation, falls, and confusion."
   },
   {
     "id": 31,
-    "category": "caregiver_instructions",
-    "query": "How should I store Aricept at home?",
+    "query": "What are the side effects of Aricept?",
     "expected_generic": "donepezil",
-    "expected_chunk_type": "storage"
+    "ground_truth": "Aricept (donepezil) may cause side effects including nausea, diarrhea, insomnia, vomiting, and muscle cramps."
   },
   {
     "id": 32,
-    "category": "caregiver_instructions",
-    "query": "Can my father take Coversyl with his blood thinner?",
+    "query": "Can Coversyl be taken with anticoagulants?",
     "expected_generic": "perindopril",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "Perindopril can be used with blood thinners but requires monitoring for blood pressure and kidney function."
   },
   {
     "id": 33,
-    "category": "caregiver_instructions",
     "query": "Should Glucophage be taken with food or without?",
     "expected_generic": "metformin",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Glucophage (metformin) should be taken with meals to reduce gastrointestinal side effects."
   },
   {
     "id": 34,
-    "category": "caregiver_instructions",
-    "query": "كيف أحفظ دواء الأنسولين في المنزل؟",
-    "expected_generic": "insulin",
-    "expected_chunk_type": "storage"
+    "query": "What are the drug interactions of Warfarin?",
+    "expected_generic": "warfarin",
+    "ground_truth": "Warfarin interacts with many drugs including aspirin, antibiotics, and antifungals, which can increase the risk of bleeding."
   },
   {
     "id": 35,
-    "category": "caregiver_instructions",
-    "query": "Can my mother take Panadol and Brufen together?",
+    "query": "Can Panadol and Brufen be taken together?",
     "expected_generic": "acetaminophen",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "Acetaminophen and ibuprofen can sometimes be taken together, but this should be done cautiously and under medical advice."
   },
   {
     "id": 36,
-    "category": "caregiver_instructions",
     "query": "What drugs should not be taken with Coversyl?",
     "expected_generic": "perindopril",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "Perindopril should be used cautiously with other blood pressure medications, potassium supplements, or certain diuretics."
   },
   {
     "id": 37,
-    "category": "caregiver_instructions",
-    "query": "Is it safe for an elderly Alzheimer's patient to take Xanax?",
+    "query": "Is Xanax safe for elderly patients with Alzheimer's?",
     "expected_generic": "alprazolam",
-    "expected_chunk_type": "side_effects_and_warnings"
+    "ground_truth": "Alprazolam should be used cautiously in elderly patients due to increased risk of sedation, falls, and confusion."
   },
   {
     "id": 38,
-    "category": "caregiver_instructions",
-    "query": "هل يمكن إعطاء المريض الكونكور مع دواء السكري؟",
+    "query": "Can Concor be taken with diabetes medication?",
     "expected_generic": "bisoprolol",
-    "expected_chunk_type": "interactions_and_overdose"
+    "ground_truth": "Bisoprolol can be used with diabetes medications but blood sugar levels should be monitored as it may mask symptoms of hypoglycemia."
   },
   {
     "id": 39,
-    "category": "caregiver_instructions",
-    "query": "How should I store Exelon patches?",
+    "query": "What are the contraindications of Exelon?",
     "expected_generic": "rivastigmine",
-    "expected_chunk_type": "storage"
+    "ground_truth": "Exelon (rivastigmine) is contraindicated in patients with known hypersensitivity to rivastigmine or other carbamate derivatives."
   },
   {
     "id": 40,
-    "category": "caregiver_instructions",
-    "query": "Can Lipitor be crushed for a patient who cannot swallow?",
+    "query": "Can Lipitor tablets be crushed for patients who cannot swallow?",
     "expected_generic": "atorvastatin",
-    "expected_chunk_type": "dosage"
+    "ground_truth": "Atorvastatin tablets should generally not be crushed unless advised by a healthcare professional."
   },
   {
     "id": 41,
-    "category": "general_medical_knowledge",
     "query": "What is Aricept used for?",
     "expected_generic": "donepezil",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Aricept (donepezil) is used to treat symptoms of Alzheimer's disease by improving memory and cognitive function."
   },
   {
     "id": 42,
-    "category": "general_medical_knowledge",
     "query": "What condition does Ebixa treat?",
     "expected_generic": "memantine",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Ebixa (memantine) is used to treat moderate to severe Alzheimer's disease."
   },
   {
     "id": 43,
-    "category": "general_medical_knowledge",
-    "query": "ما هو دواء الأريسبت؟",
+    "query": "What is Aricept medication used for?",
     "expected_generic": "donepezil",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Donepezil is used to treat symptoms of Alzheimer's disease and to improve memory and cognition."
   },
   {
     "id": 44,
-    "category": "general_medical_knowledge",
     "query": "What is Reminyl prescribed for?",
     "expected_generic": "galantamine",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Reminyl (galantamine) is prescribed for the treatment of mild to moderate Alzheimer's disease."
   },
   {
     "id": 45,
-    "category": "general_medical_knowledge",
     "query": "Is Concor a blood pressure medicine?",
     "expected_generic": "bisoprolol",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Concor (bisoprolol) is a beta-blocker used to treat high blood pressure and heart conditions."
   },
   {
     "id": 46,
-    "category": "general_medical_knowledge",
-    "query": "What is Augmentin used to treat?",
-    "expected_generic": "amoxicillin clavulanate",
-    "expected_chunk_type": "identity_and_usage"
+    "query": "What does Zoloft treat?",
+    "expected_generic": "sertraline",
+    "ground_truth": "Zoloft (sertraline) is used to treat depression, obsessive-compulsive disorder, panic disorder, and anxiety disorders."
   },
   {
     "id": 47,
-    "category": "general_medical_knowledge",
-    "query": "ما استخدام دواء الغلوكوفاج؟",
+    "query": "What is Glucophage used for?",
     "expected_generic": "metformin",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Metformin is used to treat type 2 diabetes by lowering blood sugar levels."
   },
   {
     "id": 48,
-    "category": "general_medical_knowledge",
     "query": "What type of drug is Zoloft?",
     "expected_generic": "sertraline",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Zoloft (sertraline) is a selective serotonin reuptake inhibitor used to treat depression and anxiety disorders."
   },
   {
     "id": 49,
-    "category": "general_medical_knowledge",
     "query": "What is Nexium prescribed for?",
     "expected_generic": "esomeprazole",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Nexium (esomeprazole) is used to treat acid reflux and stomach ulcers by reducing stomach acid."
   },
   {
     "id": 50,
-    "category": "general_medical_knowledge",
-    "query": "هل الكريستور دواء للكوليسترول؟",
+    "query": "Is Crestor a cholesterol medication?",
     "expected_generic": "rosuvastatin",
-    "expected_chunk_type": "identity_and_usage"
+    "ground_truth": "Yes, rosuvastatin is a medication used to lower cholesterol levels in the blood."
   }
 ]

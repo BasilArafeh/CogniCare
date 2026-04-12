@@ -3,15 +3,15 @@ import json
 import uuid
 from datetime import datetime
 
-from rag.pipeline.components.extraction import extract_pdf_elements
-from rag.pipeline.components.cleaning import clean_elements
-from rag.pipeline.components.chunkers.chunker_pdfs import chunk_elements
-from rag.pipeline.components.enrichment import process_chunks as llm_enrich_chunks
+from CogniCare.rag.pipeline.components.extraction import extract_pdf_elements
+from CogniCare.rag.pipeline.components.cleaning import clean_elements
+from CogniCare.rag.pipeline.components.chunkers.chunker_pdfs import chunk_elements
+from CogniCare.rag.pipeline.components.enrichment import process_chunks as llm_enrich_chunks
 
 DATA_FOLDERS = [
-    "/Users/leensalman/Desktop/gp2/rag/data/raw/communication_guidelines",
-    "/Users/leensalman/Desktop/gp2/rag/data/raw/mental_health",
-    "/Users/leensalman/Desktop/gp2/rag/data/raw/alzheimers_and_other_sicknesses"
+    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/communication_guidelines",
+    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/mental_health",
+    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/alzheimers_and_other_sicknesses"
 ]
 
 OUTPUT_PATH = "/Users/leensalman/Desktop/gp2/rag/data/processed/chunks.json"
