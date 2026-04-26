@@ -196,3 +196,16 @@ def process_chunks(chunks):
     enriched = generate_titles(cleaned)
 
     return enriched
+
+
+if __name__ == "__main__":
+    import sys
+    from extract import extract_pdf_elements
+    from clean import clean_elements
+    from chunk import chunk_elements
+    path = sys.argv[1] if len(sys.argv) > 1 else input("PDF path: ").strip()
+    chunks = chunk_elements(clean_elements(extract_pdf_elements(path)))
+    enriched = process_chunks(chunks)
+    print(f"Enriched {len(enriched)} chunks")
+    for c in enriched[:3]:
+        print(f"\nTitle: {c.get('title', '(none)')}\n{c['content'][:200]}")

@@ -2,10 +2,10 @@
 
 import os
 
-from rag.pipeline.components.extraction import extract_pdf_elements
-from rag.pipeline.components.cleaning import clean_elements
-from rag.pipeline.components.chunkers.chunker_pdfs import chunk_elements
-from rag.pipeline.components.enrichment import process_chunks as llm_enrich_chunks
+from CogniCare.rag.documents.extract import extract_pdf_elements
+from CogniCare.rag.documents.clean import clean_elements
+from CogniCare.rag.documents.chunk import chunk_elements
+from CogniCare.rag.documents.enrich import process_chunks as llm_enrich_chunks
 
 
 # =========================

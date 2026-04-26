@@ -106,3 +106,15 @@ def chunk_elements(elements, chunk_size=700, overlap=120):
             })
 
     return chunks
+
+
+if __name__ == "__main__":
+    import sys
+    from extract import extract_pdf_elements
+    from clean import clean_elements
+    path = sys.argv[1] if len(sys.argv) > 1 else input("PDF path: ").strip()
+    elements = clean_elements(extract_pdf_elements(path))
+    chunks = chunk_elements(elements)
+    print(f"Generated {len(chunks)} chunks")
+    for c in chunks[:3]:
+        print(f"\n[{c['section']}]\n{c['content'][:200]}")

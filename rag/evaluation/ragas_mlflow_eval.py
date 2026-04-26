@@ -26,7 +26,7 @@ import mlflow
 from openai import OpenAI
 import chromadb
 
-from CogniCare.rag.pipeline.web_fallback import WebFallback
+from CogniCare.rag.retrieval.web_fallback import WebFallback
 
 load_dotenv()
 
@@ -422,8 +422,6 @@ if __name__ == "__main__":
             hit_count += 1
 
         # ── Generate local answer ──────────────────────────────────────────────
-        local_answer = generate_answer(q["query"], contexts)
-
         local_answer = generate_answer(q["query"], contexts)
 
         # ── Web fallback if local answer is empty ──────────────────────────────

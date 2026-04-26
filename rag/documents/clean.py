@@ -140,3 +140,14 @@ def clean_elements(elements):
     cleaned = fix_structure(elements)
     cleaned = merge_fragments(cleaned)
     return cleaned
+
+
+if __name__ == "__main__":
+    import sys
+    from extract import extract_pdf_elements
+    path = sys.argv[1] if len(sys.argv) > 1 else input("PDF path: ").strip()
+    raw = extract_pdf_elements(path)
+    cleaned = clean_elements(raw)
+    print(f"Cleaned: {len(cleaned)} elements")
+    for el in cleaned[:5]:
+        print(f"\n[{el['type']}] {el['text'][:120]}")
