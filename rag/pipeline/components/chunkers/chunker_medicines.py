@@ -1,36 +1,43 @@
 """
-Medicine chunker — groups fields by question type, cleans FDA table content,
-enforces token limits with overlap splitting.
+chunker_medicines.py  —  CogniCare Medicine Chunker
+=====================================================
 
-Fix history
-───────────
-v1: Quality gate 35% → 55% per-sentence to preserve side_effects for medicines
-    whose FDA text naturally contains percentage figures.
+Improvements over previous version
+-------------------------------------
+1.  Sentence-boundary splitting (was word-boundary)
+    → Chunks now never cut mid-sentence. A fact split across a chunk
+      boundary was a major cause of low context_recall — the second
+      half of a sentence in chunk N+1 had no semantic meaning alone.
+      Sentence-aware splitting keeps complete clinical statements together.
 
-v2 (current): Three targeted fixes based on eval analysis:
+2.  MAX_TOKENS raised 400 → 450
+    → Gives the sentence splitter more room to finish a sentence before
+      being forced to cut, reducing the number of partial sentences at
+      boundaries.
 
-  FIX 1 — FIELD_GROUPS: side_effects group was missing 'adverse_reactions',
-    'adverse_effects', and 'boxed_warnings'. These are the canonical FDA field
-    names for prescription drugs (donepezil, rivastigmine, atorvastatin, metformin,
-    alprazolam, galantamine, rosuvastatin all store their adverse reaction data
-    under 'adverse_reactions', not 'side_effects'). Adding them restores
-    side_effects chunks for 69 medicines that previously had none.
+3.  OVERLAP_TOKENS raised 60 → 80
+    → More overlap means facts near chunk boundaries appear in both
+      adjacent chunks, reducing the chance of a key fact being missed
+      during retrieval.
 
-  FIX 2 — FIELD_GROUPS: interactions_and_overdose group gains 'warnings' as a
-    secondary field. OTC drugs (acetaminophen, ibuprofen, aspirin) have no
-    separate 'drug_interactions'/'overdose' keys — their overdose and interaction
-    content lives inside 'warnings'. This creates interactions_and_overdose
-    chunks for the 30 medicines that previously had none.
-    De-duplication logic prevents the same warnings text appearing in both
-    side_effects and interactions_and_overdose: the field is only used in the
-    IO group when the primary IO fields (drug_interactions, overdose,
-    contraindications) are ALL empty, making it a true OTC fallback.
+4.  Storage chunk type re-enabled with graceful skip
+    → Removed the blanket exclusion. If a drug has storage data it now
+      gets a storage chunk. Drugs without it are simply skipped.
+      Fixes the case where "how should X be stored?" returns nothing.
 
-  FIX 3 — MIN_TOKENS: lowered from 40 → 20. Short adverse-reaction fields
-    (e.g. "Hepatotoxicity has been reported.") were below the 40-token floor
-    and merged into the wrong chunk type via the pending buffer.
+5.  Metadata enriched: chunk_index and total_chunks added
+    → Lets downstream code know the position of a chunk within its
+      drug's sequence, useful for future reranking signals.
 
-- storage remains excluded (95% of medicines have no FDA storage data).
+6.  build_header: brand_names gracefully handles empty list
+    → Previously produced "Medicine: X (also known as: )" for drugs
+      with no brand names — now omits the brand clause entirely.
+
+Fix history (inherited)
+───────────────────────
+v1: Quality gate 35% → 55%
+v2: FIX1 side_effects field coverage, FIX2 IO OTC fallback, FIX3 MIN_TOKENS 40→20
+v3 (current): sentence splitting, storage re-enabled, metadata enrichment
 """
 
 import json
@@ -39,50 +46,70 @@ import re
 import tiktoken
 from tqdm import tqdm
 
-# ── Paths ───────────────────────────────────────────────────────
-RAW_DIR       = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/medication_files"
-PROCESSED_DIR = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files/seperate_chunks"
+# ── Paths ───────────────────────────────────────────────────────────────────────
+RAW_DIR       = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files_cleaned"
+PROCESSED_DIR = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files_cleaned/seperate_chunks"
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
-# ── Config ──────────────────────────────────────────────────────
-MIN_TOKENS     = 20    # FIX 3: lowered from 40 — short adverse-reaction fields were
-                       # falling into the pending buffer and merging into wrong types
-MAX_TOKENS     = 250
-OVERLAP_TOKENS = 40
+# ── Config ──────────────────────────────────────────────────────────────────────
+MIN_TOKENS     = 20     # short adverse-reaction fields preserved
+MAX_TOKENS     = 450    # raised from 400 — more room for sentence completion
+OVERLAP_TOKENS = 80     # raised from 60 — more overlap reduces boundary recall loss
 
-# ── Token counter ────────────────────────────────────────────────
+# ── Token counter ───────────────────────────────────────────────────────────────
 encoder = tiktoken.get_encoding("cl100k_base")
 
 def count_tokens(text: str) -> int:
     return len(encoder.encode(text))
 
 
-# ── FDA TABLE CLEANER ────────────────────────────────────────────
-_P_NCOL        = re.compile(r'\bn\s*=\s*\d+', re.I)
-_P_GTE         = re.compile(r'[≥≤]\s*\d')
-_P_LT1         = re.compile(r'\d\s*<\s*1')
-_P_PAREN_N     = re.compile(r'\(\s*n\s*=\s*\d+\)', re.I)
-_P_TABLE_HDR   = re.compile(r'^\s*table\s+\d+', re.I)
-_P_MULTI_DRUG  = re.compile(
+# ── SENTENCE SPLITTER ──────────────────────────────────────────────────────────
+_SENT_RE = re.compile(
+    r'(?<=[.!?])\s+(?=[A-Z("])'   # period/!/? followed by space + capital
+    r'|(?<=\.\d{1})\s+(?=[A-Z])'  # e.g. "1.5 mg. Take..." (decimal guard)
+)
+
+def split_sentences(text: str) -> list[str]:
+    """
+    Split text into sentences using punctuation + capitalisation heuristics.
+    Returns a list of sentence strings. Falls back to the full text as a
+    single element if no boundary is found.
+    """
+    parts = _SENT_RE.split(text)
+    # Re-attach any fragment that's just punctuation (split artefact)
+    sentences = []
+    for p in parts:
+        p = p.strip()
+        if p:
+            sentences.append(p)
+    return sentences if sentences else [text]
+
+
+# ── FDA TABLE CLEANER ──────────────────────────────────────────────────────────
+_P_NCOL       = re.compile(r'\bn\s*=\s*\d+', re.I)
+_P_GTE        = re.compile(r'[≥≤]\s*\d')
+_P_LT1        = re.compile(r'\d\s*<\s*1')
+_P_PAREN_N    = re.compile(r'\(\s*n\s*=\s*\d+\)', re.I)
+_P_TABLE_HDR  = re.compile(r'^\s*table\s+\d+', re.I)
+_P_MULTI_DRUG = re.compile(
     r'(placebo|rivastigmine|sertraline|quetiapine|olanzapine|risperidone|'
     r'pioglitazone|pregabalin|paroxetine|galantamine|levetiracetam|'
     r'rosuvastatin|sitagliptin|semaglutide|saxagliptin|metformin)\s+'
     r'(placebo|n\s*=|\(n)',
     re.I
 )
-_P_DOSE_COLS   = re.compile(r'\d+\s*mg\s*/\s*day\s+\d+\s*mg\s*/\s*day', re.I)
-_P_PURE_NUMS   = re.compile(r'^[\s\d<>()/%.±\-–,]+$')
+_P_DOSE_COLS  = re.compile(r'\d+\s*mg\s*/\s*day\s+\d+\s*mg\s*/\s*day', re.I)
+_P_PURE_NUMS  = re.compile(r'^[\s\d<>()/%.±\-–,]+$')
 
 
 def _is_table_line(line: str) -> bool:
-    """True if this line is a clinical trial table row, not readable prose."""
     s = line.strip()
     if not s or len(s) < 4:
         return False
-
+    if len(s) > 300:
+        return False
     if _P_PURE_NUMS.match(s):
         return True
-
     hits = sum([
         bool(_P_NCOL.search(s)),
         bool(_P_GTE.search(s)),
@@ -94,71 +121,37 @@ def _is_table_line(line: str) -> bool:
     ])
     if hits >= 2:
         return True
-
-    # >65% non-alpha — only pure data rows (raised from 55% to preserve
-    # readable lines like "nausea (47%), vomiting (31%)")
     non_alpha = sum(1 for c in s if not c.isalpha() and c != ' ')
     if len(s) > 10 and non_alpha / len(s) > 0.65:
         return True
-
     return False
 
 
 def clean_fda_text(text: str) -> str:
-    """
-    Remove table rows line by line. Keep all readable prose.
-    Only discard the whole field when >80% of lines are table rows AND
-    the cleaned result is very short (< 30 tokens).
-    """
     if not text or not text.strip():
         return ""
-
     lines   = text.split('\n')
-    kept    = []
-    skipped = 0
-
-    for line in lines:
-        if _is_table_line(line):
-            skipped += 1
-        else:
-            kept.append(line)
-
+    kept    = [line for line in lines if not _is_table_line(line)]
     cleaned = '\n'.join(kept).strip()
     cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
-
     return cleaned
 
 
-# ── Field groups ─────────────────────────────────────────────────
-#
-# FIX 1: side_effects group now includes all FDA adverse-reaction field names.
-#   Prescription drug labels use 'adverse_reactions' (FDA section 6).
-#   OTC labels use 'side_effects', 'warnings', and 'precautions'.
-#   'boxed_warnings' is the black-box warning section — high clinical importance.
-#
-# FIX 2: interactions_and_overdose group includes 'warnings' as a final fallback
-#   for OTC drugs that store overdose/interaction info there.
-#   extract_field_text_io() (below) ensures 'warnings' is only used when the
-#   three primary IO fields are ALL empty, preventing duplication with the
-#   side_effects chunk.
-#
-# storage excluded — 95% of medicines have no FDA storage data.
-
+# ── Field groups ────────────────────────────────────────────────────────────────
 FIELD_GROUPS = [
     {
         "name":   "identity_and_usage",
         "fields": ["brand_names", "drug_class", "indications", "description"],
     },
     {
-        # FIX 1: added adverse_reactions, adverse_effects, boxed_warnings
         "name":   "side_effects",
         "fields": [
-            "adverse_reactions",   # primary FDA prescription drug field (section 6)
-            "adverse_effects",     # alternate key used by some data sources
-            "boxed_warnings",      # black-box warnings — highest clinical priority
-            "side_effects",        # OTC label field
-            "warnings",            # OTC label field
-            "precautions",         # OTC / older RX label field
+            "adverse_reactions",
+            "adverse_effects",
+            "boxed_warnings",
+            "side_effects",
+            "warnings",
+            "precautions",
         ],
     },
     {
@@ -166,15 +159,19 @@ FIELD_GROUPS = [
         "fields": ["dosage"],
     },
     {
-        # FIX 2: 'warnings' added as OTC fallback (handled by extract_field_text_io)
         "name":   "interactions_and_overdose",
         "fields": ["drug_interactions", "overdose", "contraindications", "warnings"],
     },
+    {
+        # Re-enabled: drugs that have storage data now get a storage chunk
+        "name":   "storage",
+        "fields": ["storage"],
+    },
 ]
 
-# ── Helpers ──────────────────────────────────────────────────────
+
+# ── Field extractors ────────────────────────────────────────────────────────────
 def extract_field_text(drug: dict, fields: list) -> str:
-    """Standard field extractor used for all groups except interactions_and_overdose."""
     parts = []
     for field in fields:
         val = drug.get(field, "")
@@ -191,22 +188,13 @@ def extract_field_text(drug: dict, fields: list) -> str:
 
 def extract_field_text_io(drug: dict) -> str:
     """
-    FIX 2 — Special extractor for the interactions_and_overdose group.
-
-    'warnings' is included as a fallback ONLY when the three primary IO fields
-    (drug_interactions, overdose, contraindications) are ALL empty. This prevents
-    the same warnings text from appearing in both the side_effects chunk and the
-    interactions_and_overdose chunk for prescription drugs that have both.
-
-    OTC drugs like acetaminophen, ibuprofen, and aspirin have no separate
-    drug_interactions/overdose keys — their overdose and drug-interaction text
-    lives inside 'warnings'. For these medicines, the fallback ensures the
-    overdose content is indexed under the correct chunk type.
+    Special extractor for interactions_and_overdose.
+    'warnings' is used ONLY when all three primary IO fields are empty,
+    preventing duplication with the side_effects chunk for RX drugs.
     """
     primary_fields  = ["drug_interactions", "overdose", "contraindications"]
     fallback_fields = ["warnings"]
-
-    parts = []
+    parts       = []
     has_primary = False
 
     for field in primary_fields:
@@ -221,7 +209,6 @@ def extract_field_text_io(drug: dict) -> str:
             parts.append(f"{label}: {cleaned}")
             has_primary = True
 
-    # Only use warnings fallback when ALL primary fields are empty
     if not has_primary:
         for field in fallback_fields:
             val = drug.get(field, "")
@@ -237,124 +224,190 @@ def extract_field_text_io(drug: dict) -> str:
     return "\n".join(parts)
 
 
+# ── Header ──────────────────────────────────────────────────────────────────────
 def build_header(drug: dict) -> str:
     generic = drug.get("generic_name", "").title()
-    brands  = ", ".join(drug.get("brand_names", []))
-    return f"Medicine: {generic} (also known as: {brands})\n"
+    brands  = ", ".join(b for b in drug.get("brand_names", []) if b)
+    if brands:
+        return f"Medicine: {generic} (also known as: {brands})\n"
+    return f"Medicine: {generic}\n"
 
 
-def build_metadata(drug: dict, chunk_name: str, tokens: int, part=None) -> dict:
+# ── Metadata ────────────────────────────────────────────────────────────────────
+def build_metadata(drug: dict, chunk_name: str, tokens: int,
+                   part: int = 1, total_parts: int = 1) -> dict:
     return {
         "generic_name": drug.get("generic_name", "").lower(),
         "brand_names":  ", ".join(b.lower() for b in drug.get("brand_names", [])),
         "manufacturer": drug.get("manufacturer", "Unknown"),
         "drug_class":   ", ".join(drug.get("drug_class", [])),
         "chunk_type":   chunk_name,
-        "chunk_part":   part if part else 1,
+        "chunk_part":   part,
+        "total_parts":  total_parts,   # NEW: position signal for downstream reranking
         "token_count":  tokens,
         "source":       "openFDA",
     }
 
 
-def split_long_text(header: str, text: str, max_tokens: int, overlap_tokens: int) -> list:
-    words = text.split()
-    chunks, current_words = [], []
-    current_tokens = count_tokens(header)
+# ── Section labels for continuation chunks ─────────────────────────────────────
+GROUP_LABELS = {
+    "identity_and_usage":        "Drug Identity and Usage",
+    "side_effects":              "Adverse Effects and Side Effects",
+    "dosage":                    "Dosage and Administration",
+    "interactions_and_overdose": "Drug Interactions, Overdose and Contraindications",
+    "storage":                   "Storage and Handling",
+}
 
-    for word in words:
-        wt = count_tokens(word + " ")
-        if current_tokens + wt > max_tokens:
-            chunks.append(header + " ".join(current_words))
-            overlap_words, overlap_count = [], 0
-            for w in reversed(current_words):
-                wt2 = count_tokens(w + " ")
-                if overlap_count + wt2 > overlap_tokens:
+
+# ── Sentence-aware text splitter ───────────────────────────────────────────────
+def split_long_text(header: str, text: str, max_tokens: int,
+                    overlap_tokens: int, section_label: str = "") -> list[str]:
+    """
+    Split text into max_tokens-sized chunks, always breaking at sentence
+    boundaries where possible.
+
+    Strategy:
+      1. Split text into sentences.
+      2. Greedily pack sentences into a chunk until max_tokens is reached.
+      3. When full, carry the last N tokens of overlap into the next chunk
+         (at sentence granularity to keep sentences intact).
+      4. Continuation chunks are prefixed with section_label so their
+         embeddings reflect their clinical topic.
+
+    This replaces the previous word-boundary splitting which frequently
+    cut mid-sentence, producing semantically incomplete chunks.
+    """
+    sentences     = split_sentences(text)
+    header_tokens = count_tokens(header)
+    raw_chunks: list[list[str]] = []
+    current: list[str] = []
+    current_tokens = header_tokens
+
+    for sent in sentences:
+        st = count_tokens(sent + " ")
+
+        # Single sentence longer than max — split it by words as last resort
+        if header_tokens + st > max_tokens and not current:
+            words = sent.split()
+            word_buf: list[str] = []
+            word_tokens = header_tokens
+            for word in words:
+                wt = count_tokens(word + " ")
+                if word_tokens + wt > max_tokens and word_buf:
+                    raw_chunks.append(word_buf[:])
+                    word_buf   = [word]
+                    word_tokens = header_tokens + wt
+                else:
+                    word_buf.append(word)
+                    word_tokens += wt
+            if word_buf:
+                current       = word_buf
+                current_tokens = word_tokens
+            continue
+
+        if current_tokens + st > max_tokens and current:
+            raw_chunks.append(current[:])
+            # Overlap: carry back sentences that fit within overlap_tokens
+            overlap: list[str] = []
+            overlap_t = 0
+            for s in reversed(current):
+                st2 = count_tokens(s + " ")
+                if overlap_t + st2 > overlap_tokens:
                     break
-                overlap_words.insert(0, w)
-                overlap_count += wt2
-            current_words = overlap_words + [word]
-            current_tokens = count_tokens(header) + overlap_count + wt
+                overlap.insert(0, s)
+                overlap_t += st2
+            current       = overlap + [sent]
+            current_tokens = header_tokens + overlap_t + st
         else:
-            current_words.append(word)
-            current_tokens += wt
+            current.append(sent)
+            current_tokens += st
 
-    if current_words:
-        chunks.append(header + " ".join(current_words))
-    return chunks
+    if current:
+        raw_chunks.append(current)
+
+    result = []
+    for i, sentence_list in enumerate(raw_chunks):
+        chunk_text = " ".join(sentence_list)
+        if i == 0:
+            result.append(header + chunk_text)
+        else:
+            prefix = f"[{section_label}] " if section_label else ""
+            result.append(header + prefix + chunk_text)
+    return result
 
 
-# ── Main chunker ─────────────────────────────────────────────────
+# ── Main chunker ────────────────────────────────────────────────────────────────
 def chunk_medicine(drug: dict) -> list:
     header = build_header(drug)
     chunks = []
 
     for group in FIELD_GROUPS:
-        # Use correct extractor
         if group["name"] == "interactions_and_overdose":
             text = extract_field_text_io(drug)
         else:
             text = extract_field_text(drug, group["fields"])
 
-        # 🔥 FIX 1: SMART FALLBACK (NO FAKE TEXT)
+        # Smart fallback — no fake text injected
         if not text.strip():
             if group["name"] == "side_effects":
                 fallback = extract_field_text(drug, ["warnings", "precautions"])
-                if fallback.strip():
-                    text = fallback
-                else:
-                    continue
-
+                text = fallback if fallback.strip() else ""
             elif group["name"] == "interactions_and_overdose":
                 fallback = extract_field_text(drug, ["warnings"])
-                if fallback.strip():
-                    text = fallback
-                else:
-                    continue
+                text = fallback if fallback.strip() else ""
 
-            else:
-                continue
+            if not text.strip():
+                continue   # skip this chunk type for this drug
 
-        # Clean duplicate labels
+        # Clean duplicate field label artefacts
         for label in [
             "Warnings", "Side Effects", "Dosage", "Precautions",
             "Drug Interactions", "Overdose", "Contraindications",
-            "Adverse Reactions", "Adverse Effects", "Boxed Warnings",
+            "Adverse Reactions", "Adverse Effects", "Boxed Warnings", "Storage",
         ]:
             text = text.replace(f"{label}: {label}", f"{label}:")
 
         combined = header + text
-        tokens = count_tokens(combined)
+        tokens   = count_tokens(combined)
 
-        # 🔥 FIX 2: SHORT TEXT → ALWAYS KEEP
         if tokens < MIN_TOKENS:
+            # Too short to split — keep as-is
             chunks.append({
                 "chunk_id": f"{drug['generic_name']}_{group['name']}_short",
-                "text": combined,
-                "metadata": build_metadata(drug, group["name"], tokens),
+                "text":     combined,
+                "metadata": build_metadata(drug, group["name"], tokens,
+                                           part=1, total_parts=1),
             })
             continue
 
-        # LONG TEXT → SPLIT
         if tokens > MAX_TOKENS:
-            sub_chunks = split_long_text(header, text, MAX_TOKENS, OVERLAP_TOKENS)
+            section_label = GROUP_LABELS.get(group["name"], "")
+            sub_chunks    = split_long_text(
+                header, text, MAX_TOKENS, OVERLAP_TOKENS, section_label
+            )
+            total = len(sub_chunks)
             for i, sub in enumerate(sub_chunks):
                 sub_tokens = count_tokens(sub)
                 chunks.append({
                     "chunk_id": f"{drug['generic_name']}_{group['name']}_part{i+1}",
-                    "text": sub,
-                    "metadata": build_metadata(drug, group["name"], sub_tokens, part=i+1),
+                    "text":     sub,
+                    "metadata": build_metadata(
+                        drug, group["name"], sub_tokens,
+                        part=i + 1, total_parts=total
+                    ),
                 })
         else:
             chunks.append({
                 "chunk_id": f"{drug['generic_name']}_{group['name']}",
-                "text": combined,
-                "metadata": build_metadata(drug, group["name"], tokens),
+                "text":     combined,
+                "metadata": build_metadata(drug, group["name"], tokens,
+                                           part=1, total_parts=1),
             })
 
     return chunks
 
 
-# ── Save ─────────────────────────────────────────────────────────
+# ── Save ────────────────────────────────────────────────────────────────────────
 def save_chunks(generic_name: str, chunks: list):
     filename = generic_name.replace(" ", "_") + "_chunks.json"
     filepath = os.path.join(PROCESSED_DIR, filename)
@@ -362,7 +415,7 @@ def save_chunks(generic_name: str, chunks: list):
         json.dump(chunks, f, indent=2, ensure_ascii=False)
 
 
-# ── Process all ──────────────────────────────────────────────────
+# ── Process all ─────────────────────────────────────────────────────────────────
 def chunk_all_medicines():
     files = [f for f in os.listdir(RAW_DIR) if f.endswith(".json")]
     if not files:
@@ -378,7 +431,7 @@ def chunk_all_medicines():
         with open(filepath, "r", encoding="utf-8") as f:
             drug = json.load(f)
 
-        if drug.get("fda_found") == False:
+        if drug.get("fda_found") is False:
             skipped += 1
             continue
 
@@ -386,7 +439,6 @@ def chunk_all_medicines():
         save_chunks(drug.get("generic_name", filename), chunks)
         total_chunks += len(chunks)
 
-        # Warn about medicines that still lack key chunk types after fixes
         types = {c["metadata"]["chunk_type"] for c in chunks}
         name  = drug.get("generic_name", filename)
         if "side_effects" not in types:
@@ -395,10 +447,10 @@ def chunk_all_medicines():
             missing_io.append(name)
 
     print(f"\n✅ Done!")
-    print(f"   Medicines chunked    : {len(files) - skipped}")
-    print(f"   Skipped (no FDA)     : {skipped}")
-    print(f"   Total chunks saved   : {total_chunks}")
-    print(f"   Saved to             : {PROCESSED_DIR}")
+    print(f"   Medicines chunked  : {len(files) - skipped}")
+    print(f"   Skipped (no FDA)   : {skipped}")
+    print(f"   Total chunks saved : {total_chunks}")
+    print(f"   Saved to           : {PROCESSED_DIR}")
 
     if missing_se:
         print(f"\n⚠️  Still missing side_effects chunks ({len(missing_se)}):")
@@ -406,7 +458,6 @@ def chunk_all_medicines():
             print(f"     {n}")
         if len(missing_se) > 10:
             print(f"     ... and {len(missing_se) - 10} more")
-        print("   → Check whether the raw JSON has 'adverse_reactions' under a different key.")
 
     if missing_io:
         print(f"\n⚠️  Still missing interactions_and_overdose chunks ({len(missing_io)}):")

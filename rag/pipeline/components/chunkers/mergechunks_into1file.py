@@ -1,8 +1,8 @@
 import json
 import os
 
-PROCESSED_DIR = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files/seperate_chunks"
-OUTPUT_DIR = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files/all_chunks"
+PROCESSED_DIR = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files_cleaned/seperate_chunks"
+OUTPUT_DIR = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files_cleaned/all_chunks"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def merge_all_chunks():

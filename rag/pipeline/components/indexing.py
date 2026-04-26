@@ -5,10 +5,9 @@ from openai import OpenAI
 import chromadb
 
 # ── CONFIG ─────────────────────────────────────────────
-CHUNKS_FILE     = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files/all_chunks/all_medicine_chunks.json"
+CHUNKS_FILE     = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files_cleaned/all_chunks/all_medicine_chunks.json"
 CHROMA_PATH     = "/Users/leensalman/Desktop/gp2/CogniCare/rag/vectorstore/chroma_db"
-COLLECTION_NAME = "medicines_openai8"
-
+COLLECTION_NAME = "medicines_openai14"
 BATCH_SIZE = 100
 
 # ── OPENAI ─────────────────────────────────────────────
