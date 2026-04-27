@@ -1,12 +1,15 @@
 import os
+import sys
 import json
 import uuid
 from datetime import datetime
 
-from CogniCare.rag.documents.extract import extract_pdf_elements
-from CogniCare.rag.documents.clean import clean_elements
-from CogniCare.rag.documents.chunk import chunk_elements
-from CogniCare.rag.documents.enrich import process_chunks as llm_enrich_chunks
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from documents.extract import extract_pdf_elements
+from documents.clean import clean_elements
+from documents.chunk import chunk_elements
+from documents.enrich import process_chunks as llm_enrich_chunks
 
 DATA_FOLDERS = [
     "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/communication_guidelines",

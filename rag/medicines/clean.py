@@ -243,6 +243,22 @@ def clean_text_field(text: str) -> str:
 
 # ── Drug-level cleaner ────────────────────────────────────────────────────────
 
+# Fields considered essential for clinical usefulness
+_QUALITY_FIELDS = ["indications", "side_effects", "dosage", "drug_interactions", "overdose"]
+
+def data_quality_score(drug: dict) -> float:
+    """
+    Returns a 0.0–1.0 score based on how many essential clinical fields are
+    populated after cleaning. Used downstream to decide whether to skip local
+    generation and go straight to web fallback.
+    """
+    populated = sum(
+        1 for f in _QUALITY_FIELDS
+        if drug.get(f) and str(drug[f]).strip()
+    )
+    return round(populated / len(_QUALITY_FIELDS), 2)
+
+
 def clean_drug(drug: dict) -> dict:
     """Return a cleaned copy of a drug dict (original is not mutated)."""
     cleaned = dict(drug)
@@ -253,6 +269,8 @@ def clean_drug(drug: dict) -> dict:
 
     if "drug_class" in cleaned and isinstance(cleaned["drug_class"], list):
         cleaned["drug_class"] = clean_drug_class(cleaned["drug_class"])
+
+    cleaned["data_quality"] = data_quality_score(cleaned)
 
     return cleaned
 

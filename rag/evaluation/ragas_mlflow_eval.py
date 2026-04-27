@@ -1,558 +1,766 @@
 """
-cognicare_eval.py  —  CogniCare RAG Evaluation (with Web Fallback)
-==================================================================
+ragas_mlflow_eval_cheap.py  —  CogniCare RAG Evaluation (Cost-Optimised)
+=========================================================================
 
-Architecture
-------------
-  1. Brand → Generic   : dictionary lookup        (0 API calls)
-  2. Drug match        : exact ChromaDB filter     (0 API calls)
-  3. Field selection   : keyword rules             (0 API calls)
-  4. Answer generation : gpt-4o                   (1 API call)
-  5. Web fallback      : if local answer is empty  (1 extra API call)
-  6. Evaluation        : LLM-as-judge             (1 API call)
+Cost reductions vs. original
+------------------------------
+1.  Generator: gpt-4o  →  gpt-4o-mini
+    Biggest single saving. gpt-4o-mini is ~15x cheaper per token.
+    For a closed-context medical RAG with a tight system prompt the
+    quality drop is small — the retrieval does the heavy lifting.
 
-Total per question: 2 calls (no fallback) or 3 calls (with fallback)
+2.  Faithfulness guardrail DISABLED by default (--no-guardrail is now True)
+    The guardrail was a second full gpt-4o generation call per question.
+    Removing it halves generation cost. Re-enable with --guardrail flag
+    if faithfulness scores are too low.
+
+3.  RAGAS judge: gpt-4o  →  gpt-4o-mini
+    RAGAS makes many small judge calls per question.  gpt-4o-mini is
+    accurate enough for faithfulness/AR on factual medical text.
+    Switch back with --ragas-judge gpt-4o for a final "gold" run.
+
+4.  Utility calls (rewrite, classify, extract): already gpt-4o-mini — kept.
+
+5.  RAGAS metrics trimmed: context_precision removed.
+    context_precision is expensive (one LLM call per retrieved chunk)
+    and least actionable during development. Keep faithfulness +
+    answer_relevancy + context_recall as the core triad.
+    Re-enable with --full-ragas flag.
+
+6.  --sample default suggestion: pass --sample 20 for quick iteration.
+    Full eval only needed for final reporting.
+
+7.  Embedding model kept as text-embedding-3-large — switching to
+    text-embedding-3-small would save ~5x on embedding cost but would
+    require rebuilding the ChromaDB collection, so left unchanged.
+
+Cost estimate per 100 questions (approximate):
+  Original:  ~$3–5   (gpt-4o gen×2 + gpt-4o RAGAS judge)
+  This file: ~$0.20–0.40  (gpt-4o-mini gen×1 + gpt-4o-mini RAGAS judge)
 """
 
 import os
+import sys
 import json
-import math
-import csv
 import argparse
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from tqdm import tqdm
 from dotenv import load_dotenv
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import mlflow
 from openai import OpenAI
 import chromadb
 
-from CogniCare.rag.retrieval.web_fallback import WebFallback
+from datasets import Dataset
+from ragas import evaluate
+from ragas.metrics.collections import (
+    faithfulness,
+    answer_relevancy,
+    context_recall,
+    # context_precision,  # COST CUT: expensive (per-chunk LLM calls); re-add for final run
+)
+from medicines.chunk import MIN_TOKENS, MAX_TOKENS, OVERLAP_TOKENS
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+from retrieval.bm25 import bm25_retrieve, cid
+from retrieval.reranker import rerank
 
 load_dotenv()
+
+# ── MLflow ─────────────────────────────────────────────────────────────────────
+mlflow.set_tracking_uri("file:///Users/leensalman/Desktop/gp2/mlruns")
 
 # ── CONFIG ─────────────────────────────────────────────────────────────────────
 EVAL_FILE         = os.path.join(os.path.dirname(__file__), "test_questions.json")
 CHROMA_PATH       = os.path.expanduser("/Users/leensalman/Desktop/gp2/CogniCare/rag/vectorstore/chroma_db")
-OPENAI_COLLECTION = "medicines_openai11"
+OPENAI_COLLECTION = "medicines_openai15"
 OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY")
 MLFLOW_EXPERIMENT = "CogniCare-RAG-Evaluation"
-CACHE_DIR         = os.path.join(os.path.dirname(__file__), "cache")
 
-mlflow.set_tracking_uri("file:///Users/leensalman/Desktop/gp2/mlruns")
+# ── MODELS ─────────────────────────────────────────────────────────────────────
+# COST CUT 1: gpt-4o → gpt-4o-mini for generation (~15x cheaper per token).
+# The tight system prompt + retrieved context keeps quality high enough for eval.
+# Switch back to "gpt-4o" only for a final "gold standard" run.
+GENERATOR_MODEL  = "gpt-4o-mini"
 
-GENERATOR_MODEL = "gpt-4o"
-JUDGE_MODEL     = "gpt-4o-mini"
+# Utility calls: already cheap, unchanged.
+UTILITY_MODEL    = "gpt-4o-mini"
 
-# ── ARGS ───────────────────────────────────────────────────────────────────────
+# COST CUT 3: gpt-4o → gpt-4o-mini for RAGAS judge.
+# gpt-4o-mini scores reliably for factual medical text; gpt-4o only needed
+# for nuanced generation quality judgement on a final run.
+RAGAS_JUDGE_MODEL = "gpt-4o-mini"
+
+HIGH_CHUNK_MEDICINES = {
+    "sertraline", "fluoxetine", "lisinopril", "haloperidol", "carbamazepine",
+    "diazepam", "warfarin", "digoxin", "furosemide", "lorazepam",
+    "atorvastatin", "metformin", "alprazolam", "rivastigmine",
+    "insulin glargine", "donepezil", "bisoprolol",
+}
+HIGH_CHUNK_K_BOOST = 13
+
+# ── CHUNK TYPE MAP ─────────────────────────────────────────────────────────────
+CHUNK_TYPE_MAP = {
+    "side_effects":          ["side_effects", "special_populations"],
+    "dosage":                ["dosage", "administration"],
+    "interactions_overdose": ["interactions_and_overdose"],
+    "storage":               ["storage"],
+    "identity":              ["identity_and_usage"],
+    "general":               None,
+}
+# OTC drugs store overdose info inside side_effects, so search both
+CHUNK_TYPE_MAP_IO_EXTENDED = ["interactions_and_overdose", "side_effects", "special_populations"]
+
+GEN_K_EASY = 3
+GEN_K_HARD = 6
+
+# ── ARGUMENTS ──────────────────────────────────────────────────────────────────
 parser = argparse.ArgumentParser()
-parser.add_argument("--sample",          type=int,  default=None)
-parser.add_argument("--run-name",        type=str,  default=None)
-parser.add_argument("--debug",           action="store_true", default=False)
-parser.add_argument("--no-web-fallback", action="store_true", default=False,
-                    help="Disable web fallback (faster, for comparison)")
+parser.add_argument("--top-k",         type=int,  default=15)
+parser.add_argument("--sample",        type=int,  default=None,
+                    help="Evaluate only first N questions. Use --sample 20 for cheap iteration.")
+parser.add_argument("--run-name",      type=str,  default=None)
+parser.add_argument("--query-rewrite", action="store_true", default=True)
+parser.add_argument("--chunk-filter",  action="store_true", default=True)
+
+# COST CUT 2: guardrail OFF by default. Was True (expensive second gpt-4o call).
+# Re-enable with --guardrail when you need maximum faithfulness signal.
+parser.add_argument("--guardrail",     action="store_true", default=False,
+                    help="Enable faithfulness guardrail (adds one LLM call per question)")
+
+# COST CUT 5: full RAGAS metrics OFF by default (context_precision is expensive).
+# Re-enable with --full-ragas for a final reporting run.
+parser.add_argument("--full-ragas",    action="store_true", default=False,
+                    help="Add context_precision metric (expensive: one LLM call per chunk)")
+
+# Override model flags — lets you do a cheap dev run then a gold run without
+# editing the file.
+parser.add_argument("--generator-model", type=str, default=GENERATOR_MODEL,
+                    help="Override generator model (e.g. gpt-4o for a gold run)")
+parser.add_argument("--ragas-judge",     type=str, default=RAGAS_JUDGE_MODEL,
+                    help="Override RAGAS judge model (e.g. gpt-4o for a gold run)")
+
+parser.add_argument("--debug",         action="store_true", default=False)
 args = parser.parse_args()
 
-os.makedirs(CACHE_DIR, exist_ok=True)
+# Apply overrides
+GENERATOR_MODEL   = args.generator_model
+RAGAS_JUDGE_MODEL = args.ragas_judge
 
 # ── LOAD QUESTIONS ─────────────────────────────────────────────────────────────
 with open(EVAL_FILE, "r", encoding="utf-8") as f:
     questions = json.load(f)
+
 if args.sample:
     questions = questions[:args.sample]
+
 print(f"Loaded {len(questions)} questions")
+print(f"Generator: {GENERATOR_MODEL} | RAGAS judge: {RAGAS_JUDGE_MODEL} | "
+      f"Guardrail: {args.guardrail} | Full RAGAS: {args.full_ragas}")
 
 # ── CLIENTS ────────────────────────────────────────────────────────────────────
-openai_client = OpenAI(api_key=OPENAI_API_KEY, timeout=30.0, max_retries=3)
+openai_client    = OpenAI(api_key=OPENAI_API_KEY)
+ragas_llm        = ChatOpenAI(model=RAGAS_JUDGE_MODEL, api_key=OPENAI_API_KEY)
+ragas_embeddings = OpenAIEmbeddings(model="text-embedding-3-large", api_key=OPENAI_API_KEY)
+
+# ── CHROMA ─────────────────────────────────────────────────────────────────────
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 collection    = chroma_client.get_collection(OPENAI_COLLECTION)
-web_fallback  = WebFallback(openai_client, model=JUDGE_MODEL)
-print(f"Collection: {collection.count()} docs")
+print(f"Loaded collection: {collection.count()} docs")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 1 — BRAND → GENERIC LOOKUP
-# ══════════════════════════════════════════════════════════════════════════════
-
-BRAND_TO_GENERIC: dict[str, str] = {
-    "aricept":    "donepezil",
-    "exelon":     "rivastigmine",
-    "reminyl":    "galantamine",
-    "razadyne":   "galantamine",
-    "ebixa":      "memantine",
-    "namenda":    "memantine",
-    "concor":     "bisoprolol",
-    "zebeta":     "bisoprolol",
-    "lipitor":    "atorvastatin",
-    "crestor":    "rosuvastatin",
-    "zocor":      "simvastatin",
-    "coumadin":   "warfarin",
-    "plavix":     "clopidogrel",
-    "lasix":      "furosemide",
-    "lanoxin":    "digoxin",
-    "coversyl":   "perindopril",
-    "zestril":    "lisinopril",
-    "prinivil":   "lisinopril",
-    "glucophage": "metformin",
-    "lantus":     "insulin glargine",
-    "toujeo":     "insulin glargine",
-    "zoloft":     "sertraline",
-    "prozac":     "fluoxetine",
-    "haldol":     "haloperidol",
-    "xanax":      "alprazolam",
-    "valium":     "diazepam",
-    "ativan":     "lorazepam",
-    "tegretol":   "carbamazepine",
-    "sinemet":    "levodopa carbidopa",
-    "panadol":    "acetaminophen",
-    "tylenol":    "acetaminophen",
-    "brufen":     "ibuprofen",
-    "advil":      "ibuprofen",
-    "nurofen":    "ibuprofen",
-    "nexium":     "esomeprazole",
-}
-
-def resolve_generic(query: str) -> str | None:
-    q = query.lower()
-    for brand in sorted(BRAND_TO_GENERIC, key=len, reverse=True):
-        if brand in q:
-            return BRAND_TO_GENERIC[brand]
-    known_generics = set(BRAND_TO_GENERIC.values())
-    for generic in sorted(known_generics, key=len, reverse=True):
-        if generic in q:
-            return generic
-    return None
+# ── EMBEDDING (cached) ─────────────────────────────────────────────────────────
+@lru_cache(maxsize=512)
+def embed(query: str) -> list[float]:
+    return openai_client.embeddings.create(
+        input=[query],
+        model="text-embedding-3-large"
+    ).data[0].embedding
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 2 — QUESTION CATEGORY
-# ══════════════════════════════════════════════════════════════════════════════
+# ── RRF MERGE ──────────────────────────────────────────────────────────────────
+def rrf_merge(dense: list[tuple], sparse: list[tuple],
+              top_k: int, k: int = 60) -> tuple[list, list]:
+    scores: dict[str, float] = {}
+    registry: dict[str, tuple] = {}
 
-CATEGORY_RULES: list[tuple[str, list[str]]] = [
-    ("interactions_and_overdose", [
-        "interact", "interaction", "together with", "taken with", "combine",
-        "combination", "overdose", "too much", "excess", "toxicity", "toxic",
-        "contraindic", "dangerous with", "not be taken", "should not take",
-        "avoid with", "dangerous if",
-    ]),
-    ("side_effects", [
-        "side effect", "adverse", "cause", "causes", "causing", "reaction",
-        "symptom", "warning", "risk", "safe", "safety", "tolerat",
-        "stiffness", "shaking", "tremor", "dizziness", "nausea", "vomiting",
-        "cough", "bruise", "bleeding", "muscle pain", "confusion", "sedation",
-        "fatigue", "drowsy", "drowsiness", "elderly", "safe for",
-    ]),
-    ("dosage", [
-        "dose", "dosage", "how much", "how many", "how often", "frequency",
-        "how to take", "when to take", "morning", "night", "bedtime",
-        "before meal", "after meal", "with food", "apply", "patch",
-        "starting dose", "maximum", "minimum", "twice", "once daily",
-        "how should", "taken before", "taken after",
-    ]),
-    ("storage", [
-        "store", "storage", "keep", "refrigerat", "temperature",
-        "shelf life", "expir",
-    ]),
-    ("identity_and_usage", [
-        "what is", "used for", "treat", "prescribed for", "condition",
-        "what does", "what kind", "type of", "class", "indication",
-        "approved for", "works for",
-    ]),
-]
+    for rank, (doc, meta) in enumerate(dense):
+        c = cid(doc)
+        scores[c]   = scores.get(c, 0.0) + 1.0 / (k + rank + 1)
+        registry[c] = (doc, meta)
 
-def classify_question(query: str) -> str:
-    q = query.lower()
-    for category, keywords in CATEGORY_RULES:
-        if any(kw in q for kw in keywords):
-            return category
-    return "identity_and_usage"
+    for rank, (doc, meta) in enumerate(sparse):
+        c = cid(doc)
+        scores[c]   = scores.get(c, 0.0) + 1.0 / (k + rank + 1)
+        registry[c] = (doc, meta)
+
+    top_cids  = sorted(scores, key=lambda c: scores[c], reverse=True)[:top_k]
+    out_docs  = [registry[c][0] for c in top_cids]
+    out_metas = [registry[c][1] for c in top_cids]
+    return out_docs, out_metas
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 3 — DIRECT RETRIEVAL
-# ══════════════════════════════════════════════════════════════════════════════
-
-def retrieve_chunks(generic_name: str, chunk_type: str, top_n: int = 3) -> list[str]:
-    try:
-        result = collection.get(
-            where={
-                "$and": [
-                    {"generic_name": {"$eq": generic_name}},
-                    {"chunk_type":   {"$eq": chunk_type}},
-                ]
-            },
-            include=["documents", "metadatas"],
-            limit=top_n,
-        )
-        if result["documents"]:
-            pairs = sorted(
-                zip(result["documents"], result["metadatas"]),
-                key=lambda x: x[1].get("chunk_part", 1)
-            )
-            return [doc for doc, _ in pairs]
-    except Exception:
-        pass
-    return []
-
-
-def retrieve_all_chunks(generic_name: str, top_n: int = 5) -> list[str]:
-    """Pull all chunk types for a drug when specific type has no info."""
-    try:
-        result = collection.get(
-            where={"generic_name": {"$eq": generic_name}},
-            include=["documents", "metadatas"],
-            limit=top_n,
-        )
-        if result["documents"]:
-            pairs = sorted(
-                zip(result["documents"], result["metadatas"]),
-                key=lambda x: x[1].get("chunk_part", 1)
-            )
-            return [doc for doc, _ in pairs]
-    except Exception:
-        pass
-    return []
-
-
-def retrieve(query: str, expected_generic: str) -> tuple[list[str], str, str]:
-    generic    = resolve_generic(query) or expected_generic.lower()
-    chunk_type = classify_question(query)
-    contexts   = retrieve_chunks(generic, chunk_type,
-                                 top_n=5 if chunk_type == "interactions_and_overdose" else 3)
-
-    # For interactions/overdose also pull side_effects
-    if chunk_type == "interactions_and_overdose":
-        extra = retrieve_chunks(generic, "side_effects", top_n=2)
-        seen  = set(contexts)
-        for doc in extra:
-            if doc not in seen:
-                contexts.append(doc)
-                seen.add(doc)
-
-    # For dosage also pull identity chunk
-    if chunk_type == "dosage" and len(contexts) < 2:
-        extra = retrieve_chunks(generic, "identity_and_usage", top_n=1)
-        contexts += [d for d in extra if d not in set(contexts)]
-
-    # If still thin — pull all chunks for this drug
-    if len(contexts) < 2:
-        all_chunks = retrieve_all_chunks(generic, top_n=5)
-        seen = set(contexts)
-        for doc in all_chunks:
-            if doc not in seen:
-                contexts.append(doc)
-                seen.add(doc)
-
-    if not contexts:
-        contexts = retrieve_chunks(generic, "identity_and_usage", top_n=2)
-
-    return contexts, generic, chunk_type
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 4 — ANSWER GENERATION
-# ══════════════════════════════════════════════════════════════════════════════
-
-SYSTEM_PROMPT = """\
-You are CogniCare, a clinical medical information assistant for healthcare providers
-and caregivers. Your answers are grounded exclusively in the provided drug database
-context. You do not have opinions and you do not practice medicine.
-
-════════════════════════════════════════════════
-GROUNDING RULES  (non-negotiable)
-════════════════════════════════════════════════
-1. SOURCE RESTRICTION
-   Answer ONLY from the context provided below.
-   If the specific information is not in the context, you MUST output exactly:
-   "This information is not available in the provided context."
-   Never fill gaps with general medical knowledge, training data, or assumptions.
-   It is always better to admit a gap than to hallucinate an answer.
-
-2. NO INFERENCE
-   Do not draw conclusions beyond what the context explicitly states.
-   Do not combine facts from different sentences to create new claims.
-   Do not say "likely", "probably", or "may" unless the context uses those words.
-
-3. HALLUCINATION CHECK
-   Before finalising your answer, mentally verify: can every sentence be pointed
-   to a specific line in the context? If not, remove that sentence.
-
-════════════════════════════════════════════════
-FORMAT RULES
-════════════════════════════════════════════════
-4. OPENING
-   Always open by naming the drug directly.
-   Use "BrandName (generic_name)" format when both appear in context.
-   Example: "Aricept (donepezil) is indicated for..."
-   Never open with "Based on the context", "According to", or "The medication".
-
-5. LENGTH
-   2–4 sentences for simple factual questions.
-   Up to 6 sentences for complex questions (interactions, overdose, multi-drug).
-   Never pad with disclaimers or repetition.
-
-6. LANGUAGE
-   Always respond in English regardless of the question language.
-   Use clinical but accessible language — avoid jargon unless it is in the context.
-
-════════════════════════════════════════════════
-CLINICAL CONTENT RULES
-════════════════════════════════════════════════
-7. DRUG NAMES
-   Always use both brand and generic name on first mention if both appear in context.
-   For subsequent mentions use the generic name only.
-
-8. DOSAGE QUESTIONS
-   State the dose exactly as written in context — never round or paraphrase numbers.
-   If the context gives a range, state the full range.
-
-9. SIDE EFFECTS QUESTIONS
-   List the specific effects mentioned in context.
-   Do not add "consult your doctor" or safety advice unless the context states it.
-
-10. INTERACTION QUESTIONS
-    Name every drug involved in the interaction.
-    State the consequence of the interaction as written in context.
-    If severity is mentioned (e.g. "serious", "contraindicated"), include it.
-
-11. OVERDOSE QUESTIONS
-    If context describes overdose symptoms or management, state them exactly.
-    Never add emergency instructions not present in the context.
-
-12. PARTIAL CONTEXT
-    If the context partially addresses the question, answer what it supports,
-    then add one sentence: "The context does not specify [missing detail]."
-    Do not say the information is unavailable if part of it is available.
-
-════════════════════════════════════════════════
-WHAT YOU MUST NEVER DO
-════════════════════════════════════════════════
-- Never recommend a specific treatment or course of action
-- Never contradict the context even if you believe it is outdated
-- Never mention that you are an AI or that you have a knowledge cutoff
-- Never say "I cannot help with that" — either answer from context or say it is not in the context
-- Never use bullet points unless the context itself lists items
-- Never start a sentence with "I"\
-"""
-
-def generate_answer(query: str, contexts: list[str]) -> str:
-    if not contexts:
-        return "This information is not available in the provided context."
-    context_block = "\n\n---\n\n".join(contexts)
-    r = openai_client.chat.completions.create(
-        model=GENERATOR_MODEL,
+# ── QUERY REWRITING ────────────────────────────────────────────────────────────
+def rewrite_query(query: str) -> str:
+    response = openai_client.chat.completions.create(
+        model=UTILITY_MODEL,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": f"Context:\n{context_block}\n\nQuestion: {query}\n\nAnswer:"},
+            {
+                "role": "system",
+                "content": (
+                    "You are a medical search assistant. "
+                    "Rewrite the user's question as a short, precise English medical search query. "
+                    "Include the medicine generic name if known, and the medical topic. "
+                    "Output ONLY the rewritten query — no explanation, no punctuation at the end.\n\n"
+                    "Examples:\n"
+                    "Q: Can Exelon cause dizziness?\n"
+                    "A: rivastigmine dizziness side effects\n\n"
+                    "Q: Can Brufen be given every 4 hours?\n"
+                    "A: ibuprofen dosage frequency\n\n"
+                    "Q: What should be done if a patient overdoses on Panadol?\n"
+                    "A: acetaminophen overdose treatment\n\n"
+                    "Q: What drugs should not be taken with Coversyl?\n"
+                    "A: perindopril drug interactions contraindications\n\n"
+                    "Q: Is Crestor a cholesterol medication?\n"
+                    "A: rosuvastatin indication usage\n\n"
+                    "Q: What are the contraindications of Xanax in elderly patients?\n"
+                    "A: alprazolam contraindications elderly\n\n"
+                    "Q: Is Xanax safe for elderly patients with Alzheimer's?\n"
+                    "A: alprazolam elderly safety contraindications\n\n"
+                    "Q: Can Lipitor tablets be crushed?\n"
+                    "A: atorvastatin tablet crushing administration"
+                )
+            },
+            {"role": "user", "content": query}
         ],
-        temperature=0,
+        temperature=0
     )
-    return r.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 5 — LLM-AS-JUDGE
-# ══════════════════════════════════════════════════════════════════════════════
+# ── CHUNK TYPE DETECTION ───────────────────────────────────────────────────────
+_CLASSIFY_SYSTEM = """\
+Classify this medical question into exactly one category. Output ONLY the category name.
 
-JUDGE_SYSTEM = """\
-You are a medical QA evaluator. Score the answer on 3 criteria.
-Output ONLY a JSON object with keys: correctness, completeness, faithfulness.
-Each score is 1-5 where 5=perfect, 4=good, 3=partial, 2=mostly wrong, 1=completely wrong.
+Categories:
+- side_effects      : questions about adverse effects, symptoms caused by the drug,
+                      warnings, precautions, tolerability, safety profile
+- dosage            : questions about dose, frequency, how to take, timing,
+                      administration, how to apply a patch or cream
+- interactions_overdose : questions about drug interactions, overdose, what happens if
+                          too much is taken, contraindications, what NOT to take together,
+                          safety in specific populations (elderly, pregnant, renal),
+                          whether a drug can be crushed or split
+- identity          : questions about what a drug is used for, what condition it treats,
+                      drug class, mechanism, what it is
+- general           : anything else
 
-correctness  : Is the answer factually accurate given the ground truth?
-completeness : Does the answer cover the key facts in the ground truth?
-faithfulness : Does the answer stick to facts without hallucination?
+Output one word only."""
 
-Output format (JSON only, no other text):
-{"correctness": N, "completeness": N, "faithfulness": N}"""
-
-def judge_answer(query: str, answer: str, ground_truth: str) -> dict:
-    prompt = (
-        f"Question: {query}\n\n"
-        f"Ground Truth: {ground_truth}\n\n"
-        f"Answer to evaluate: {answer}"
-    )
+def detect_chunk_types(query: str) -> list | None:
     try:
-        r = openai_client.chat.completions.create(
-            model=JUDGE_MODEL,
+        response = openai_client.chat.completions.create(
+            model=UTILITY_MODEL,
             messages=[
-                {"role": "system", "content": JUDGE_SYSTEM},
-                {"role": "user",   "content": prompt},
+                {"role": "system", "content": _CLASSIFY_SYSTEM},
+                {"role": "user",   "content": query},
+            ],
+            temperature=0,
+            max_tokens=10,
+        )
+        category = response.choices[0].message.content.strip().lower()
+    except Exception:
+        return None
+
+    if category == "interactions_overdose":
+        return CHUNK_TYPE_MAP_IO_EXTENDED
+
+    return CHUNK_TYPE_MAP.get(category, None)
+
+
+# ── MEDICINE NAME EXTRACTION ───────────────────────────────────────────────────
+_BRAND_MAP = (
+    "Panadol → acetaminophen, Brufen → ibuprofen, Aricept → donepezil, "
+    "Exelon → rivastigmine, Ebixa → memantine, Reminyl → galantamine, "
+    "Concor → bisoprolol, Lipitor → atorvastatin, Glucophage → metformin, "
+    "Xanax → alprazolam, Valium → diazepam, Crestor → rosuvastatin, "
+    "Zoloft → sertraline, Nexium → esomeprazole, Coumadin → warfarin, "
+    "Lantus → insulin glargine, Sinemet → levodopa carbidopa, "
+    "Tegretol → carbamazepine, Prozac → fluoxetine, Haldol → haloperidol, "
+    "Lasix → furosemide, Ativan → lorazepam, Plavix → clopidogrel"
+)
+
+_EXTRACT_MEDICINE_SYSTEM = f"""\
+Extract the medicine name from this question. Output ONLY the generic name in lowercase.
+Convert brand names to generic where known ({_BRAND_MAP}).
+If no medicine is mentioned, output: none"""
+
+def extract_medicine_name(query: str) -> str | None:
+    try:
+        response = openai_client.chat.completions.create(
+            model=UTILITY_MODEL,
+            messages=[
+                {"role": "system", "content": _EXTRACT_MEDICINE_SYSTEM},
+                {"role": "user",   "content": query},
+            ],
+            temperature=0,
+            max_tokens=10,
+        )
+        name = response.choices[0].message.content.strip().lower()
+        return None if name == "none" else name
+    except Exception:
+        return None
+
+
+# ── MULTI-DRUG NAME EXTRACTION ─────────────────────────────────────────────────
+_EXTRACT_ALL_MEDICINES_SYSTEM = f"""\
+Extract ALL medicine names mentioned in this question.
+Output ONLY lowercase generic names, one per line.
+Convert brand names to generic where known ({_BRAND_MAP}).
+If no medicine is mentioned, output: none"""
+
+def extract_all_medicine_names(query: str) -> list[str]:
+    try:
+        response = openai_client.chat.completions.create(
+            model=UTILITY_MODEL,
+            messages=[
+                {"role": "system", "content": _EXTRACT_ALL_MEDICINES_SYSTEM},
+                {"role": "user",   "content": query},
             ],
             temperature=0,
             max_tokens=60,
         )
-        raw = r.choices[0].message.content.strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        scores = json.loads(raw)
-        return {
-            "correctness":  float(scores.get("correctness",  0)),
-            "completeness": float(scores.get("completeness", 0)),
-            "faithfulness": float(scores.get("faithfulness", 0)),
-        }
-    except Exception as e:
-        if args.debug:
-            print(f"  [judge error] {e}")
-        return {"correctness": 0.0, "completeness": 0.0, "faithfulness": 0.0}
+        text = response.choices[0].message.content.strip().lower()
+        return [n.strip() for n in text.splitlines()
+                if n.strip() and n.strip() != "none"]
+    except Exception:
+        return []
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MAIN
-# ══════════════════════════════════════════════════════════════════════════════
+# ── PARALLEL QUERY PREPROCESSING ──────────────────────────────────────────────
+def preprocess_query(query: str, use_rewrite: bool, use_filter: bool, difficulty: str):
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_rewrite = ex.submit(rewrite_query, query) if use_rewrite else None
+        f_chunk   = ex.submit(detect_chunk_types, query) if use_filter else None
 
-def is_correct_retrieval(generic_found: str, expected: str) -> bool:
-    return generic_found.lower().strip() == expected.lower().strip()
+        if difficulty == "hard":
+            f_meds = ex.submit(extract_all_medicine_names, query)
+        else:
+            f_meds = ex.submit(extract_medicine_name, query)
+
+        search_query  = f_rewrite.result() if f_rewrite else query
+        chunk_types   = f_chunk.result()   if f_chunk   else None
+        meds_result   = f_meds.result()
+
+    if difficulty == "hard":
+        all_medicines   = meds_result if isinstance(meds_result, list) else []
+        target_medicine = all_medicines[0] if len(all_medicines) == 1 else None
+    else:
+        all_medicines   = []
+        target_medicine = meds_result if isinstance(meds_result, str) else None
+
+    return search_query, chunk_types, target_medicine, all_medicines
 
 
-if __name__ == "__main__":
-    results        = []
-    hit_count      = 0
-    fallback_count = 0
+# ── METADATA RE-RANKING ────────────────────────────────────────────────────────
+def rerank_by_medicine(docs: list, metas: list, target_medicine: str | None, top_k: int):
+    if not target_medicine:
+        return docs[:top_k], metas[:top_k]
 
-    print(f"\nWeb fallback: {'OFF' if args.no_web_fallback else 'ON'}")
-    print("Running pipeline...")
+    matching, non_matching = [], []
+    for doc, meta in zip(docs, metas):
+        generic    = meta.get("generic_name", "").lower()
+        brands_raw = meta.get("brand_names", "")
+        brands     = [b.strip().lower() for b in brands_raw.split(",") if b.strip()]
+
+        if target_medicine == generic or target_medicine in brands:
+            matching.append((doc, meta))
+        else:
+            non_matching.append((doc, meta))
+
+    reranked       = matching + non_matching
+    reranked_docs  = [d for d, _ in reranked]
+    reranked_metas = [m for _, m in reranked]
+    return reranked_docs[:top_k], reranked_metas[:top_k]
+
+
+# ── BM25 WRAPPER ───────────────────────────────────────────────────────────────
+def _bm25_retrieve(query: str, generic_name: str | None,
+                   chunk_types: list | None, n: int) -> tuple[list, list]:
+    return bm25_retrieve(
+        query, generic_name, chunk_types, n,
+        collection_name=OPENAI_COLLECTION,
+        chroma_path=CHROMA_PATH,
+    )
+
+
+# ── MULTI-DRUG RETRIEVAL ───────────────────────────────────────────────────────
+def _retrieve_multi_drug(emb, search_query: str, medicines: list[str],
+                         chunk_types, top_k: int):
+    per_drug_k   = max(5, -(-top_k // len(medicines)))
+    drug_buckets: list[list] = []
+    seen: set = set()
+
+    for med in medicines:
+        dense_pairs: list[tuple] = []
+        where_filter: dict = {"generic_name": {"$eq": med}}
+        if chunk_types:
+            where_filter = {"$and": [
+                {"generic_name": {"$eq": med}},
+                {"chunk_type":   {"$in": chunk_types}},
+            ]}
+        try:
+            res = collection.query(
+                query_embeddings=[emb],
+                n_results=per_drug_k,
+                where=where_filter,
+                include=["documents", "metadatas"],
+            )
+            dense_pairs = list(zip(res["documents"][0], res["metadatas"][0]))
+        except Exception:
+            pass
+
+        bm25_docs, bm25_metas = _bm25_retrieve(search_query, med, chunk_types, per_drug_k)
+        sparse_pairs = list(zip(bm25_docs, bm25_metas))
+
+        merged_docs, merged_metas = rrf_merge(dense_pairs, sparse_pairs, per_drug_k)
+        bucket: list = []
+        for doc, meta in zip(merged_docs, merged_metas):
+            if doc not in seen:
+                seen.add(doc)
+                bucket.append((doc, meta))
+        drug_buckets.append(bucket)
+
+    all_pairs: list = []
+    max_len = max((len(b) for b in drug_buckets), default=0)
+    for i in range(max_len):
+        for bucket in drug_buckets:
+            if i < len(bucket):
+                all_pairs.append(bucket[i])
+
+    all_docs  = [d for d, _ in all_pairs]
+    all_metas = [m for _, m in all_pairs]
+
+    if len(all_docs) < top_k:
+        res = collection.query(
+            query_embeddings=[emb],
+            n_results=top_k,
+            include=["documents", "metadatas"],
+        )
+        for doc, meta in zip(res["documents"][0], res["metadatas"][0]):
+            if doc not in seen and len(all_docs) < top_k:
+                seen.add(doc)
+                all_docs.append(doc)
+                all_metas.append(meta)
+
+    return all_docs[:top_k], all_metas[:top_k]
+
+
+# ── RETRIEVAL ──────────────────────────────────────────────────────────────────
+def retrieve(query: str, top_k: int, use_filter: bool = True,
+             use_rewrite: bool = True, difficulty: str = "easy"):
+    search_query, chunk_types, target_medicine, all_medicines = preprocess_query(
+        query, use_rewrite, use_filter, difficulty
+    )
+
+    emb = embed(search_query)
+
+    if difficulty == "hard" and len(all_medicines) > 1:
+        multi_k = top_k + len(all_medicines) * 3
+        docs, metas = _retrieve_multi_drug(
+            emb, search_query, all_medicines, chunk_types=None, top_k=multi_k
+        )
+        docs, metas = rerank(search_query, docs, metas, top_n=top_k)
+        return docs, metas
+
+    if difficulty == "hard":
+        effective_k = top_k + HIGH_CHUNK_K_BOOST + 2
+    elif target_medicine and target_medicine in HIGH_CHUNK_MEDICINES:
+        effective_k = top_k + HIGH_CHUNK_K_BOOST
+    else:
+        effective_k = top_k + 2 if chunk_types else top_k
+
+    query_kwargs = dict(
+        query_embeddings=[emb],
+        n_results=effective_k,
+        include=["documents", "metadatas"],
+    )
+    if chunk_types:
+        query_kwargs["where"] = {"chunk_type": {"$in": chunk_types}}
+
+    results     = collection.query(**query_kwargs)
+    dense_docs  = results["documents"][0]
+    dense_metas = results["metadatas"][0]
+    active_types = chunk_types
+
+    if chunk_types and len(dense_docs) < top_k:
+        results      = collection.query(
+            query_embeddings=[emb],
+            n_results=effective_k,
+            include=["documents", "metadatas"],
+        )
+        dense_docs   = results["documents"][0]
+        dense_metas  = results["metadatas"][0]
+        active_types = None
+
+    if target_medicine:
+        sparse_docs, sparse_metas = _bm25_retrieve(
+            search_query, target_medicine, active_types, effective_k
+        )
+        dense_pairs  = list(zip(dense_docs, dense_metas))
+        sparse_pairs = list(zip(sparse_docs, sparse_metas))
+        merged_docs, merged_metas = rrf_merge(dense_pairs, sparse_pairs, effective_k)
+    else:
+        merged_docs, merged_metas = dense_docs, dense_metas
+
+    merged_docs, merged_metas = rerank(
+        search_query, merged_docs, merged_metas, top_n=top_k
+    )
+    merged_docs, merged_metas = rerank_by_medicine(
+        merged_docs, merged_metas, target_medicine, top_k
+    )
+
+    return merged_docs, merged_metas
+
+
+# ── SYSTEM PROMPT ──────────────────────────────────────────────────────────────
+SYSTEM_PROMPT = """\
+You are a clinical medical assistant. Answer the question using ONLY the context provided below.
+
+Rules:
+1. Base your answer exclusively on facts stated in the context.
+   Do NOT infer, assume, or add clinical knowledge beyond what the context contains.
+   If a fact is not in the context, do not state it.
+2. Always answer in English.
+3. When the context mentions a brand name, include it as "BrandName (generic_name)"
+   — e.g. "Panadol (acetaminophen)". If only the generic name appears, use only that.
+4. Open your answer by directly addressing the question with the medicine name
+   — e.g. "Exelon (rivastigmine) can cause..." not "This medication can cause...".
+5. Keep your answer to 2–4 sentences. Be direct and complete.
+6. Do not start with "Based on the context..." or "According to the provided information...".
+7. If the context only partially addresses the question, answer what the context supports
+   and state what is missing in one sentence. Only say "This information is not available
+   in the provided context." if the context contains nothing relevant.
+8. Do not add safety warnings, recommendations, or advice beyond what the context states.
+9. For multi-drug questions (interactions, combinations, comparisons): name every drug
+   and state the interaction or finding first, then supporting detail.
+10. Every factual claim in your answer must be directly traceable to the context.
+    Do not fill gaps with general medical knowledge.\
+"""
+
+def generate_answer(query: str, contexts: list[str]) -> str:
+    context_block = "\n\n---\n\n".join(contexts)
+    response = openai_client.chat.completions.create(
+        model=GENERATOR_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"Context:\n{context_block}\n\n"
+                    f"Question: {query}\n\n"
+                    "Answer:"
+                )
+            }
+        ],
+        temperature=0,
+    )
+    return response.choices[0].message.content.strip()
+
+
+# ── FAITHFULNESS GUARDRAIL (optional, off by default) ─────────────────────────
+_GUARDRAIL_SYSTEM = """\
+You are a medical fact-checker. You will be given a context and an answer.
+
+Your task:
+- Read every factual claim in the answer.
+- Remove or rewrite any claim that is NOT directly supported by the context.
+- Do NOT add new information — only keep or rewrite what is already in the answer.
+- Keep the answer concise (2–4 sentences) and fluent.
+- Output ONLY the corrected answer. No explanations, no preamble."""
+
+def faithfulness_guardrail(answer: str, contexts: list[str]) -> str:
+    context_block = "\n\n---\n\n".join(contexts)
+    try:
+        response = openai_client.chat.completions.create(
+            model=GENERATOR_MODEL,   # uses same (cheaper) model as generator
+            messages=[
+                {"role": "system", "content": _GUARDRAIL_SYSTEM},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Context:\n{context_block}\n\n"
+                        f"Answer to verify:\n{answer}\n\n"
+                        "Corrected answer:"
+                    )
+                }
+            ],
+            temperature=0,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return answer
+
+
+# ── IS_CORRECT ─────────────────────────────────────────────────────────────────
+def is_correct(meta, expected):
+    gen        = meta.get("generic_name", "").lower()
+    brands_raw = meta.get("brand_names", "")
+
+    if isinstance(brands_raw, str):
+        brands = [b.strip().lower() for b in brands_raw.split(",") if b.strip()]
+    else:
+        brands = [b.lower() for b in brands_raw]
+
+    exp = expected.lower()
+    return exp == gen or exp in brands
+
+
+# ── RETRIEVAL METRICS ──────────────────────────────────────────────────────────
+def compute_retrieval(top_k):
+    hits, mrr = 0, 0
+    for q in questions:
+        difficulty = q.get("difficulty", "easy")
+        _, metas = retrieve(q["query"], top_k, args.chunk_filter,
+                            args.query_rewrite, difficulty=difficulty)
+        rank = next(
+            (i + 1 for i, m in enumerate(metas) if is_correct(m, q["expected_generic"])),
+            None
+        )
+        if rank:
+            hits += 1
+            mrr  += 1 / rank
+
+    total = len(questions)
+    return {f"hit_at_{top_k}": hits / total, "mrr": mrr / total}
+
+
+# ── BUILD RAGAS DATASET ────────────────────────────────────────────────────────
+def build_dataset(top_k):
+    data = []
+    print("Building dataset...")
 
     for q in tqdm(questions):
-        # ── Retrieve ───────────────────────────────────────────────────────────
-        contexts, resolved_generic, chunk_type = retrieve(
-            q["query"], q["expected_generic"]
+        difficulty = q.get("difficulty", "easy")
+        contexts, _ = retrieve(
+            q["query"], top_k, args.chunk_filter,
+            args.query_rewrite, difficulty=difficulty
         )
 
-        hit = is_correct_retrieval(resolved_generic, q["expected_generic"])
-        if hit:
-            hit_count += 1
+        gen_k  = GEN_K_EASY if difficulty == "easy" else GEN_K_HARD
+        prompt_contexts = contexts[:gen_k]
 
-        # ── Generate local answer ──────────────────────────────────────────────
-        local_answer = generate_answer(q["query"], contexts)
+        answer = generate_answer(q["query"], prompt_contexts)
 
-        # ── Web fallback if local answer is empty ──────────────────────────────
-        used_fallback = False
-        source        = "local"
-        source_url    = None
-
-        if not args.no_web_fallback:
-            fallback_result = web_fallback.answer_with_fallback(
-                query=q["query"],
-                local_answer=local_answer,
-                generic_name=resolved_generic,
-            )
-            final_answer  = fallback_result.answer
-            used_fallback = fallback_result.used_fallback
-            source        = fallback_result.source
-            source_url    = fallback_result.source_url
-
-            if used_fallback:
-                fallback_count += 1
-                if args.debug:
-                    print(f"  [WEB FALLBACK] {q['query'][:60]}")
-                    print(f"  [WEB SOURCE]   {source_url}")
-        else:
-            final_answer = local_answer
-
-        # ── Judge ──────────────────────────────────────────────────────────────
-        scores = judge_answer(q["query"], final_answer, q["ground_truth"])
+        # COST CUT 2: guardrail off by default; only runs when --guardrail passed
+        if args.guardrail:
+            answer = faithfulness_guardrail(answer, prompt_contexts)
 
         if args.debug:
-            print(f"\n{'─'*60}")
-            print(f"Q [{q.get('difficulty','?')}]: {q['query']}")
-            print(f"Resolved: {resolved_generic} | Type: {chunk_type} | Source: {source}")
-            print(f"A: {final_answer[:200]}")
-            print(f"Scores: {scores}")
+            print(f"\nQUESTION [{difficulty}]: {q['query']}")
+            print(f"TOP CHUNK:  {contexts[0][:200]}")
+            print(f"ANSWER:     {answer[:200]}")
 
-        results.append({
-            "id":               q["id"],
-            "difficulty":       q.get("difficulty", "easy"),
-            "query":            q["query"],
-            "expected_generic": q["expected_generic"],
-            "resolved_generic": resolved_generic,
-            "chunk_type":       chunk_type,
-            "retrieval_hit":    hit,
-            "ground_truth":     q["ground_truth"],
-            "local_answer":     local_answer,
-            "final_answer":     final_answer,
-            "used_fallback":    used_fallback,
-            "source":           source,
-            "source_url":       source_url or "",
-            "n_contexts":       len(contexts),
-            **scores,
+        data.append({
+            "question":     q["query"],
+            "answer":       answer,
+            "contexts":     contexts,
+            "ground_truth": q.get("ground_truth", q["expected_generic"]),
         })
 
-    # ── Metrics ────────────────────────────────────────────────────────────────
-    total = len(results)
+    return Dataset.from_list(data)
 
-    def avg(key):
-        vals = [r[key] for r in results if r[key] > 0]
-        return sum(vals) / len(vals) if vals else 0.0
 
-    def avg_norm(key):
-        return (avg(key) - 1) / 4
+# ── RUN RAGAS ──────────────────────────────────────────────────────────────────
+def run_ragas(dataset):
+    # COST CUT 5: context_precision excluded by default (per-chunk LLM calls)
+    metrics_list = [faithfulness, answer_relevancy, context_recall]
+    if args.full_ragas:
+        from ragas.metrics.collections import context_precision
+        metrics_list.append(context_precision)
+        print("Full RAGAS: context_precision enabled")
 
-    metrics = {
-        "retrieval_hit_rate": hit_count / total,
-        "web_fallback_rate":  fallback_count / total,
-        "correctness_raw":    avg("correctness"),
-        "completeness_raw":   avg("completeness"),
-        "faithfulness_raw":   avg("faithfulness"),
-        "correctness":        avg_norm("correctness"),
-        "completeness":       avg_norm("completeness"),
-        "faithfulness":       avg_norm("faithfulness"),
-        "overall_score":      avg_norm("correctness") * 0.4
-                            + avg_norm("completeness") * 0.4
-                            + avg_norm("faithfulness") * 0.2,
-    }
-
-    for diff in ["easy", "medium"]:
-        subset = [r for r in results if r["difficulty"] == diff]
-        if subset:
-            for key in ["correctness", "completeness", "faithfulness"]:
-                vals = [r[key] for r in subset if r[key] > 0]
-                metrics[f"{diff}_{key}"] = (
-                    (sum(vals) / len(vals) - 1) / 4 if vals else 0.0
-                )
-
-    print(f"\n{'='*50}")
-    print("── RESULTS ──")
-    print(f"{'='*50}")
-    print(f"retrieval_hit_rate : {metrics['retrieval_hit_rate']:.4f}")
-    print(f"web_fallback_rate  : {metrics['web_fallback_rate']:.4f}  ({fallback_count}/{total} questions used web)")
-    print(f"correctness  (0-1) : {metrics['correctness']:.4f}  (raw: {metrics['correctness_raw']:.2f}/5)")
-    print(f"completeness (0-1) : {metrics['completeness']:.4f}  (raw: {metrics['completeness_raw']:.2f}/5)")
-    print(f"faithfulness (0-1) : {metrics['faithfulness']:.4f}  (raw: {metrics['faithfulness_raw']:.2f}/5)")
-    print(f"overall_score      : {metrics['overall_score']:.4f}")
-
-    if "easy_correctness" in metrics:
-        print(f"\n── By difficulty ──")
-        for diff in ["easy", "medium"]:
-            if f"{diff}_correctness" in metrics:
-                print(f"  {diff:6s}: corr={metrics[f'{diff}_correctness']:.3f}  "
-                      f"comp={metrics[f'{diff}_completeness']:.3f}  "
-                      f"faith={metrics[f'{diff}_faithfulness']:.3f}")
-
-    # ── Save CSV ───────────────────────────────────────────────────────────────
-    csv_path = os.path.join(
-        os.path.dirname(__file__),
-        f"eval_results_{args.run_name or 'run'}.csv"
+    result = evaluate(
+        dataset=dataset,
+        metrics=metrics_list,
+        llm=ragas_llm,
+        embeddings=ragas_embeddings,
+        raise_exceptions=False,
     )
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=list(results[0].keys()))
-        writer.writeheader()
-        writer.writerows(results)
-    print(f"\nPer-question results → {csv_path}")
 
-    # ── MLflow ─────────────────────────────────────────────────────────────────
+    df_scores = result.to_pandas()
+    df_input  = dataset.to_pandas()
+    df        = df_input.join(df_scores)
+
+    if args.debug:
+        print("\n── PER-QUESTION SCORES ──")
+        for _, row in df.iterrows():
+            cp_str = f"  |  CP: {row['context_precision']:.3f}" if args.full_ragas else ""
+            print(f"\nQ:  {row['question'][:80]}")
+            print(f"A:  {row['answer'][:120]}")
+            print(f"F:  {row['faithfulness']:.3f}  |  AR: {row['answer_relevancy']:.3f}"
+                  f"  |  CR: {row['context_recall']:.3f}{cp_str}")
+
+    out = {
+        "ragas_faithfulness":      df["faithfulness"].mean(),
+        "ragas_answer_relevancy":  df["answer_relevancy"].mean(),
+        "ragas_context_recall":    df["context_recall"].mean(),
+    }
+    if args.full_ragas:
+        out["ragas_context_precision"] = df["context_precision"].mean()
+    return out
+
+
+# ── MAIN ───────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
-    run_name = args.run_name or "web_fallback"
-    with mlflow.start_run(run_name=run_name):
-        mlflow.log_params({
-            "generator_model":    GENERATOR_MODEL,
-            "judge_model":        JUDGE_MODEL,
-            "retrieval_strategy": "exact_metadata_filter",
-            "web_fallback":       not args.no_web_fallback,
-            "n_questions":        total,
-            "collection":         OPENAI_COLLECTION,
-        })
-        mlflow.log_metrics({k: v for k, v in metrics.items() if not math.isnan(v)})
 
-    print(f"\n✅ Logged to MLflow (run: {run_name})")
-    web_calls = fallback_count if not args.no_web_fallback else 0
-    print(f"API calls: {total * 2 + web_calls} total  "
-          f"({total} generate + {total} judge + {web_calls} web fallback)")
+    top_k = args.top_k
+
+    print("Running retrieval metrics...")
+    retrieval = compute_retrieval(top_k)
+
+    dataset = build_dataset(top_k)
+
+    print("Running RAGAS evaluation...")
+    ragas = run_ragas(dataset)
+
+    metrics = {**retrieval, **ragas}
+
+    print("\n── RESULTS ──")
+    for k, v in metrics.items():
+        print(f"{k}: {v:.4f}")
+
+    with mlflow.start_run(run_name=args.run_name or f"run_top{top_k}"):
+        mlflow.log_params({
+            "top_k":                  top_k,
+            "min_tokens":             MIN_TOKENS,
+            "max_tokens":             MAX_TOKENS,
+            "overlap_tokens":         OVERLAP_TOKENS,
+            "generator_model":        GENERATOR_MODEL,
+            "utility_model":          UTILITY_MODEL,
+            "ragas_judge_model":      RAGAS_JUDGE_MODEL,
+            "embedding_model":        "text-embedding-3-large",
+            "query_rewrite":          args.query_rewrite,
+            "chunk_filter":           args.chunk_filter,
+            "chunk_classifier":       "llm_gpt4o_mini",
+            "medicine_reranking":     True,
+            "io_dual_type_search":    True,
+            "high_chunk_k_boost":     HIGH_CHUNK_K_BOOST,
+            "gen_k_easy":             GEN_K_EASY,
+            "gen_k_hard":             GEN_K_HARD,
+            "hybrid_search":          True,
+            "bge_reranker":           True,
+            "faithfulness_guardrail": args.guardrail,
+            "full_ragas":             args.full_ragas,
+            "parallel_preprocessing": True,
+            "embedding_cache":        True,
+            "test_set":               "english_direct_v4",
+            "chunk_collection":       OPENAI_COLLECTION,
+        })
+        mlflow.log_metrics(metrics)
+
+    print("\n✅ Logged to MLflow")

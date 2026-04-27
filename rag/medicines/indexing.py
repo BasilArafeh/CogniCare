@@ -2,12 +2,15 @@ import os
 import json
 from tqdm import tqdm
 from openai import OpenAI
+from dotenv import load_dotenv
 import chromadb
 
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env"))
+
 # ── CONFIG ─────────────────────────────────────────────
-CHUNKS_FILE     = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medication_files_cleaned/all_chunks/all_medicine_chunks.json"
+CHUNKS_FILE     = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/medicines/all_medicine_chunks.json"
 CHROMA_PATH     = "/Users/leensalman/Desktop/gp2/CogniCare/rag/vectorstore/chroma_db"
-COLLECTION_NAME = "medicines_openai14"
+COLLECTION_NAME = "medicines_openai15"
 BATCH_SIZE      = 100
 MAX_BATCH       = 5000
 
@@ -72,6 +75,7 @@ def main():
                 "brand_names":  meta.get("brand_names", ""),
                 "chunk_type":   meta.get("chunk_type", "").lower(),
                 "chunk_part":   meta.get("chunk_part", 1),
+                "total_parts":  meta.get("total_parts", 1),
                 "token_count":  meta.get("token_count", 0),
                 "drug_class":   meta.get("drug_class", ""),
                 "manufacturer": meta.get("manufacturer", "Unknown"),
@@ -109,21 +113,23 @@ def main():
         print(doc[:200])
 
     # ── VERIFY: chunk_type filter ──────────────────────
-    # Sanity check that the chunk_type filter works correctly.
-    # If this returns 0 results, something went wrong with metadata storage.
-    print("\nTesting chunk_type filter (side_effects)...")
-    results_filtered = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=3,
-        where={"chunk_type": {"$in": ["side_effects"]}},
-    )
-    filtered_docs = results_filtered["documents"][0]
-    if filtered_docs:
-        for doc in filtered_docs:
-            print("\n---")
-            print(doc[:200])
-    else:
-        print("WARNING: chunk_type filter returned 0 results — check metadata storage.")
+    # Sanity check for all 7 chunk types produced by chunk.py.
+    # If any return 0 results, something went wrong with metadata storage.
+    for ctype in [
+        "side_effects", "dosage", "administration", "special_populations",
+        "interactions_and_overdose", "storage", "identity_and_usage",
+    ]:
+        print(f"\nTesting chunk_type filter ({ctype})...")
+        results_filtered = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=3,
+            where={"chunk_type": {"$in": [ctype]}},
+        )
+        filtered_docs = results_filtered["documents"][0]
+        if filtered_docs:
+            print(f"  ✅ {len(filtered_docs)} result(s) — {filtered_docs[0][:100]}")
+        else:
+            print(f"  ⚠️  WARNING: '{ctype}' returned 0 results — check metadata storage.")
 
 
 if __name__ == "__main__":

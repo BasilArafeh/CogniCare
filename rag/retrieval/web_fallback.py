@@ -105,7 +105,7 @@ class WebFallback:
         answer_lower = answer.lower().strip()
 
         # Too short to be a real medical answer
-        if len(answer_lower) < 30:
+        if len(answer_lower) < 60:
             return True
 
         return any(trigger in answer_lower for trigger in FALLBACK_TRIGGERS)
