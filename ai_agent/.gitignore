@@ -1,2 +1,14 @@
 .env
-__pycache__
+.env.*
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+chroma_store/
+.pytest_cache/
+.coverage*
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+Thumbs.db
+.idea/

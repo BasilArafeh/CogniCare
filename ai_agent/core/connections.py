@@ -1,79 +1,100 @@
 """
-agent/core/connections.py
---------------------------
-Initializes all external clients once and shares them across the agent layer.
-Never re-initialize clients elsewhere — always import from here.
+Shared singleton clients for the agent layer; import from here instead of creating new clients.
 
-Clients:
-  - openai_client     → intent_router.py, agent_executor.py
-  - supabase_client   → memory_manager.py, escalation_manager.py
-  - chroma_client     → kept for admin/test operations
-  - chroma_collection → rag_agent.py
-
-Constants:
-  - web_search_api_key → rag_tools.py (web_search_fallback)
-  - person1_api_url    → orchestrator.py (Person 1 API calls)
-
-Requires in .env:
-  OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY,
-  CHROMA_PATH, WEB_SEARCH_API_KEY, PERSON1_API_URL
+Provides OpenAI (sync + async), Supabase, optional Chroma, and config strings for RAG / Person1.
 """
 
-import os
 import logging
-from dotenv import load_dotenv
+from typing import Any
 
 import openai
-from supabase import create_client, Client
-import chromadb
 
-load_dotenv()
+from core.config import config
+
+try:
+    from supabase import Client, create_client  # type: ignore[reportMissingImports]
+except Exception:
+    create_client = None
+    Client = Any
+
+try:
+    import chromadb
+except Exception:
+    chromadb = None
+
 logger = logging.getLogger(__name__)
 
 
-# OpenAI client — used by intent router and ReAct agent
+# Creates the synchronous OpenAI API client used by LangChain tools and blocking code paths.
 def _init_openai() -> openai.OpenAI:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = config.openai_api_key
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set in .env")
     return openai.OpenAI(api_key=api_key)
 
 
-# Supabase client — used for memory and alert logging
+# Creates the asyncio OpenAI client used by async routes such as intent classification.
+def _init_async_openai() -> openai.AsyncOpenAI:
+    api_key = config.openai_api_key
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set in .env")
+    return openai.AsyncOpenAI(api_key=api_key)
+
+
+# Creates the Supabase client for patient data, logs, and memory tables.
 def _init_supabase() -> Client:
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
+    if create_client is None:
+        raise ImportError("Missing dependency 'supabase'. Install it with: pip install supabase")
+    url = config.supabase_url
+    key = config.supabase_key
     if not url or not key:
         raise ValueError("SUPABASE_URL or SUPABASE_KEY is not set in .env")
     return create_client(url, key)
 
 
-# ChromaDB client + collection — used by rag_agent.py for vector search
-# cosine similarity space is required for BGE-M3 embeddings
-def _init_chroma() -> tuple[chromadb.PersistentClient, chromadb.Collection]:
-    chroma_path = os.getenv("CHROMA_PATH", "./chroma_store")
+# Creates a persistent Chroma store and knowledge collection for local vector RAG search.
+def _init_chroma() -> tuple[Any, Any]:
+    if chromadb is None:
+        raise ImportError("Missing dependency 'chromadb'. Install it with: pip install chromadb")
+    chroma_path = config.chroma_path
     client = chromadb.PersistentClient(path=chroma_path)
     collection = client.get_or_create_collection(
-        name="cognicare_knowledge",
+        name=config.chroma_collection_name,
         metadata={"hnsw:space": "cosine"},
     )
-    logger.info(f"ChromaDB ready — {collection.count()} chunks loaded.")
+    logger.info("ChromaDB ready - %s chunks loaded.", collection.count())
     return client, collection
 
 
-# Shared instances — import these everywhere else
 openai_client: openai.OpenAI = _init_openai()
-supabase_client: Client = _init_supabase()
+async_openai_client: openai.AsyncOpenAI = _init_async_openai()
 
-# chroma_client kept for admin operations
-chroma_client, chroma_collection = _init_chroma()
+try:
+    supabase_client: Client | None = _init_supabase()
+except Exception as e:
+    logger.warning("Supabase client unavailable: %s", e)
+    supabase_client = None
 
-# Web search fallback — used by rag_tools.py (Tier 2 RAG)
-web_search_api_key: str = os.getenv("WEB_SEARCH_API_KEY", "")
+try:
+    chroma_client, chroma_collection = _init_chroma()
+except Exception as e:
+    logger.warning("Chroma client unavailable: %s", e)
+    chroma_client, chroma_collection = None, None
+
+web_search_api_key: str = config.web_search_api_key or ""
 if not web_search_api_key:
-    logger.warning("WEB_SEARCH_API_KEY not set — web fallback will be disabled.")
+    logger.warning("WEB_SEARCH_API_KEY not set - web fallback will be disabled.")
 
-# Person 1 API base URL — used by orchestrator for patient profile routes
-person1_api_url: str = os.getenv("PERSON1_API_URL", "")
+person1_api_url: str = config.person1_api_url or ""
 if not person1_api_url:
-    logger.warning("PERSON1_API_URL not set — Person 1 routes will fail.")
+    logger.warning("PERSON1_API_URL not set - Person 1 routes will fail.")
+
+__all__ = [
+    "async_openai_client",
+    "chroma_client",
+    "chroma_collection",
+    "openai_client",
+    "person1_api_url",
+    "supabase_client",
+    "web_search_api_key",
+]
