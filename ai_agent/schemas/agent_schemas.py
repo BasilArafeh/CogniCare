@@ -1,30 +1,32 @@
 """
-agent/schemas/agent_schemas.py
---------------------------------
-Pydantic models for FastAPI request and response validation.
-Used exclusively by api/main.py.
-
-Models:
-  - MessageRequest  → validates incoming patient messages (POST /agent/message)
-  - AgentResponse   → structures the response sent back to the frontend
+Request and response shapes for the agent API (e.g. POST /agent/message).
 """
+
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
+IntentRoute = Literal["DB", "RAG", "DB_RAG", "LLM", "CLARIFY", "EMERGENCY"]
+
+
 class MessageRequest(BaseModel):
-    """
-    Incoming request from the frontend when a patient sends a message.
-    """
-    patient_id: int = Field(..., gt=0, description="The active patient's ID.")
-    session_id: str = Field(..., min_length=1, description="Unique session identifier for this conversation sitting.")
-    message: str = Field(..., min_length=1, max_length=1000, description="The patient's message text.")
+    """One message from the client."""
+
+    patient_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=1000)
 
 
 class AgentResponse(BaseModel):
-    """
-    Response sent back to the frontend after every agent turn.
-    """
-    response: str = Field(..., description="The agent's reply in patient-friendly language.")
-    intent: str = Field(..., description="The detected route — DB, RAG, DB_RAG, LLM, CLARIFY, or EMERGENCY.")
-    session_id: str = Field(..., description="Echoed back so the frontend can continue the session.")
+    """One reply back to the client after a turn."""
+
+    response: str
+    intent: IntentRoute
+    session_id: str
+    patient_id: str
+    emergency_escalated: bool = False
+    confusion_flag: bool = False
+
+
+__all__ = ["AgentResponse", "IntentRoute", "MessageRequest"]
