@@ -48,9 +48,12 @@ cognicare/
 │   └── emergency_tool.py              # escalate_to_caregiver — orchestrator only
 │
 └── scheduler/
-    ├── scheduler.py                    # APScheduler setup + job registration
-    ├── medication_reminder.py          # Fires at medication times → sends reminder to patient
-    └── appointment_reminder.py        # Fires 24h + 1h before appointment → notifies patient + caregiver
+    ├── scheduler.py                  # APScheduler start + hourly DB reload → register jobs
+    ├── reminder_delivery.py          # Patient webhook/log + 5m window → CAREGIVER_ALERT_SMS
+    ├── queries/                      # Supabase selects only (patient_medications / meals / activities)
+    ├── medication_reminder.py        # Cron registration + fire handler
+    ├── meal_reminder.py
+    └── activity_reminder.py
 
 -You may see some built files already review them and apply changes if needed.
 -Add a simple comment above each function explaning what its for

@@ -22,6 +22,7 @@ from memory.memory_manager import get_recent_turns, load_full_memory, save_inter
 from prompts.llm_prompt import LLM_PROMPT
 from routers.intent_router import route_intent
 from schemas.agent_schemas import AgentResponse
+from scheduler.reminder_delivery import acknowledge_patient_message
 from tools.db_tools import create_database_tools
 from tools.emergency_tool import escalate_to_caregiver
 from tools.rag_tool import create_rag_tools
@@ -100,6 +101,8 @@ async def orchestrate_message(
     run_agent: AgentRunner | None = None,
 ) -> AgentResponse:
     logger.info("Orchestration started patient_id=%s session_id=%s", patient_id, session_id)
+
+    acknowledge_patient_message(patient_id)
 
     recent_turns = get_recent_turns(patient_id=patient_id, n=3)
     full_memory = load_full_memory(patient_id=patient_id)

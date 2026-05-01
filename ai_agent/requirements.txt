@@ -1,0 +1,24 @@
+# CogniCare ai_agent — pip install -r requirements.txt
+# Python 3.10+
+
+# ---------- environment & models ----------
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+
+# ---------- LLM & agent tools ----------
+openai>=1.40.0
+langchain-core>=0.2.0
+
+# ---------- database ----------
+supabase>=2.0.0
+psycopg[binary]>=3.1.0
+
+# ---------- scheduler ----------
+APScheduler>=3.10.0
+
+# ---------- optional local RAG store (Chroma) ----------
+chromadb>=0.4.0
+
+# ---------- HTTP API ----------
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
