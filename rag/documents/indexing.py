@@ -10,9 +10,10 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
 # ── CONFIG ─────────────────────────────────────────────────────────────────────
 CHUNKS_FILE     = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/documents/chunks.json"
 CHROMA_PATH     = "/Users/leensalman/Desktop/gp2/CogniCare/rag/vectorstore/chroma_db"
-COLLECTION_NAME = "documents_collection1"
+COLLECTION_NAME = "documents_collection_cosine"
 BATCH_SIZE      = 100
 MAX_BATCH       = 5000
+REBUILD         = True
 
 
 # ── EMBEDDING ──────────────────────────────────────────────────────────────────
@@ -25,7 +26,6 @@ def embed_batch(client_oai, texts):
 
 
 # ── METADATA SANITIZER ─────────────────────────────────────────────────────────
-# ChromaDB only accepts str, int, float, bool as metadata values.
 def sanitize_metadata(meta: dict) -> dict:
     sanitized = {}
     for k, v in meta.items():
@@ -49,8 +49,21 @@ def main():
     print(f"Loaded {len(chunks)} chunks")
 
     # ── CHROMA ─────────────────────────────────────────────────────────────────
-    client     = chromadb.PersistentClient(path=CHROMA_PATH)
-    collection = client.get_or_create_collection(COLLECTION_NAME)
+    client = chromadb.PersistentClient(path=CHROMA_PATH)
+
+    if REBUILD:
+        try:
+            client.delete_collection(COLLECTION_NAME)
+            print(f"Deleted existing collection: {COLLECTION_NAME}")
+        except Exception as e:
+            print(f"No existing collection deleted: {e}")
+
+    collection = client.get_or_create_collection(
+        name=COLLECTION_NAME,
+        metadata={"hnsw:space": "cosine"}
+    )
+
+    print("Collection metadata:", collection.metadata)
 
     # ── INDEXING ───────────────────────────────────────────────────────────────
     all_ids, all_docs, all_meta, all_embeds = [], [], [], []
@@ -72,15 +85,16 @@ def main():
                 "category": chunk.get("category", ""),
                 "source":   chunk.get("file_name", ""),
             })
-            all_ids.append(chunk["id"])
+
+            all_ids.append(str(chunk["id"]))
             all_docs.append(texts[j])
             all_meta.append(clean_meta)
             all_embeds.append(embeddings[j])
 
     # ── SAFETY CHECK ───────────────────────────────────────────────────────────
-    print("Docs:",   len(all_docs))
+    print("Docs:", len(all_docs))
     print("Embeds:", len(all_embeds))
-    print("IDs:",    len(all_ids))
+    print("IDs:", len(all_ids))
     assert len(all_docs) == len(all_embeds) == len(all_ids)
 
     # ── ADD TO CHROMA ──────────────────────────────────────────────────────────
@@ -91,20 +105,33 @@ def main():
             metadatas=all_meta[i:i + MAX_BATCH],
             ids=all_ids[i:i + MAX_BATCH],
         )
+
     print("✅ Indexing complete")
+    print("Final collection count:", collection.count())
+    print("Final collection metadata:", collection.metadata)
 
     # ── VERIFY: basic retrieval ────────────────────────────────────────────────
     print("\nTesting basic retrieval...")
-    test_query      = "What are the early signs of Alzheimer's disease?"
+    test_query = "What are the early signs of Alzheimer's disease?"
     query_embedding = embed_batch(client_oai, [test_query])[0]
 
-    results = collection.query(query_embeddings=[query_embedding], n_results=3)
-    for doc in results["documents"][0]:
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=3,
+        include=["documents", "metadatas", "distances"]
+    )
+
+    for doc, meta, dist in zip(
+        results["documents"][0],
+        results["metadatas"][0],
+        results["distances"][0],
+    ):
         print("\n---")
+        print("distance:", dist)
+        print("category:", meta.get("category"))
         print(doc[:200])
 
     # ── VERIFY: category filter ────────────────────────────────────────────────
-    # Sanity check that all three categories are present in the collection.
     for cat in [
         "alzheimers_and_other_sicknesses",
         "communication_guidelines",
@@ -115,12 +142,20 @@ def main():
             query_embeddings=[query_embedding],
             n_results=3,
             where={"category": {"$eq": cat}},
+            include=["documents", "metadatas", "distances"]
         )
+
         filtered_docs = results_filtered["documents"][0]
+        filtered_metas = results_filtered["metadatas"][0]
+        filtered_distances = results_filtered["distances"][0]
+
         if filtered_docs:
-            print(f"  ✅ {len(filtered_docs)} result(s) — {filtered_docs[0][:100]}")
+            print(f"  ✅ {len(filtered_docs)} result(s)")
+            print(f"  distance: {filtered_distances[0]}")
+            print(f"  category: {filtered_metas[0].get('category')}")
+            print(f"  text: {filtered_docs[0][:100]}")
         else:
-            print(f"  ⚠️  WARNING: '{cat}' returned 0 results — check metadata storage.")
+            print(f"  ⚠️ WARNING: '{cat}' returned 0 results — check metadata storage.")
 
 
 if __name__ == "__main__":

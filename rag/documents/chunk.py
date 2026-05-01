@@ -74,7 +74,7 @@ def remove_title_overlap(title, text):
     return text
 
 
-def chunk_elements(elements, chunk_size=700, overlap=120):
+def chunk_elements(elements, chunk_size=400, overlap=80):
     sections = group_by_sections(elements)
     chunks = []
 

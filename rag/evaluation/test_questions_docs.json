@@ -1,492 +1,302 @@
 [
   {
     "id": 1,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is Alzheimer's disease?",
-    "ground_truth": "Alzheimer's disease is a progressive neurological disorder that causes the brain to shrink and brain cells to die. It is the most common cause of dementia, a continuous decline in thinking, behavioral, and social skills that affects a person's ability to function independently."
+    "query": "Why do I keep forgetting things?",
+    "ground_truth": "Alzheimer's disease affects the brain in a way that makes it hard to hold on to new memories. It causes brain cells to stop working properly over time. This is why you might forget something that just happened, even though you can still remember things from long ago. It is not your fault, and it is a known part of the condition."
   },
   {
     "id": 2,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What are the early signs of Alzheimer's disease?",
-    "ground_truth": "Early signs of Alzheimer's disease include memory loss that disrupts daily life, difficulty planning or solving problems, confusion with time or place, trouble understanding visual images, problems with words in speaking or writing, misplacing things, decreased judgment, withdrawal from social activities, and changes in mood or personality."
+    "query": "What are the early signs that something might be wrong with my memory?",
+    "ground_truth": "Some early signs include forgetting things that happened recently, having trouble finding words, getting confused about dates or where you are, losing things around the house, and feeling less interested in things you used to enjoy. If these things are happening more and more, it is a good idea to speak with a doctor."
   },
   {
     "id": 3,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is the most common type of dementia?",
-    "ground_truth": "Alzheimer's disease is the most common type of dementia, accounting for 60 to 80 percent of all dementia cases."
+    "query": "Is my memory loss normal or is something wrong?",
+    "ground_truth": "Alzheimer's disease is the most common cause of serious memory loss. It accounts for most cases of dementia. While some forgetfulness is normal as we age, if memory problems are getting in the way of daily life, that is worth talking to a doctor about."
   },
   {
     "id": 4,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is the difference between dementia and Alzheimer's disease?",
-    "ground_truth": "Dementia is an umbrella term for a group of symptoms affecting memory, thinking, and social abilities severely enough to interfere with daily life. Alzheimer's disease is the most common cause of dementia, accounting for 60 to 80 percent of cases. Other causes include vascular dementia, Lewy body dementia, and frontotemporal dementia."
+    "query": "Will my memory ever get better?",
+    "ground_truth": "Right now, there is no cure for Alzheimer's disease, and the condition does tend to progress over time. However, some treatments and activities can help manage symptoms and support your quality of life. Doctors and researchers are working hard to find better treatments."
   },
   {
     "id": 5,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What are the risk factors for Alzheimer's disease?",
-    "ground_truth": "The greatest risk factor for Alzheimer's disease is increasing age. Family history and genetics also play a role. Other risk factors include cardiovascular disease, head injury, depression, social isolation, and lifestyle factors such as physical inactivity and poor diet."
+    "query": "Why do I get more confused and unsettled in the evenings?",
+    "ground_truth": "This is called sundowning, and it is very common in people with Alzheimer's. As the day goes on, tiredness and changes in light can make confusion, anxiety, and restlessness worse in the late afternoon and evening. It is not unusual and your carers can help by keeping the environment calm and your routine consistent."
   },
   {
     "id": 6,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "Can Alzheimer's disease be cured?",
-    "ground_truth": "Currently, there is no cure for Alzheimer's disease. Treatments can help manage symptoms and slow progression in some patients, but the disease is ultimately progressive. Research is ongoing to find disease-modifying therapies."
+    "query": "Will my children get Alzheimer's because of me?",
+    "ground_truth": "Having a parent with Alzheimer's does slightly increase the chances, but most cases are not directly passed on. There is a gene that can raise the risk, but it does not mean someone will definitely get the condition. Most Alzheimer's cases are not caused by a single inherited gene, especially the type that happens later in life."
   },
   {
     "id": 7,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is vascular dementia?",
-    "ground_truth": "Vascular dementia is the second most common type of dementia, caused by reduced blood flow to the brain, often following a stroke or series of mini-strokes. Symptoms include problems with reasoning, planning, judgment, and memory, and may develop suddenly or gradually."
+    "query": "Why do I sometimes feel upset, restless, or angry for no clear reason?",
+    "ground_truth": "These feelings are very common with Alzheimer's and are part of how the condition can affect mood and behaviour. You might feel agitated, anxious, or sad without being able to explain why. This is not your fault. Your care team can help find ways to make you feel calmer and more comfortable."
   },
   {
     "id": 8,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is Lewy body dementia?",
-    "ground_truth": "Lewy body dementia is caused by abnormal deposits of a protein called alpha-synuclein in the brain. It shares features with both Alzheimer's disease and Parkinson's disease, including cognitive decline, visual hallucinations, fluctuating alertness, and movement problems such as tremor and stiffness."
+    "query": "Why do I sometimes pace around or walk off without knowing where I am going?",
+    "ground_truth": "This is called wandering and it is common in Alzheimer's. It can happen because of restlessness, boredom, confusion about where you are, or even discomfort that you cannot easily express. Your carers can help by keeping your environment safe and familiar, giving you regular exercise, and making sure your daily routine is consistent and calm."
   },
   {
     "id": 9,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "How many stages does Alzheimer's disease have?",
-    "ground_truth": "Alzheimer's disease is commonly described in three broad stages: early (mild), middle (moderate), and late (severe). Some frameworks describe seven stages from no impairment through to very severe decline, with each stage representing progressive loss of independence."
+    "query": "What happens to my memory and abilities as my condition gets more advanced?",
+    "ground_truth": "In the early stages you may still do many things independently, with some support. As things progress, daily tasks become harder and you may need more help. In later stages, communication becomes more difficult and personal care will be needed. Every person's journey is different, and your care team will always try to support your comfort and dignity at every stage."
   },
   {
     "id": 10,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is sundowning in dementia?",
-    "ground_truth": "Sundowning refers to increased confusion, agitation, anxiety, and disorientation that occurs in the late afternoon and evening in people with dementia. It is common in Alzheimer's disease and may be related to fatigue, disrupted circadian rhythms, or reduced lighting as the day ends."
+    "query": "I sometimes walk off and get lost. How can we keep me safe?",
+    "ground_truth": "There are several things that can help keep you safe. Your family can install door alarms, use a GPS tracker, register you with a safe return programme, and make sure your home environment is secure. Keeping a consistent routine and making sure you have regular activity during the day can also help reduce the urge to wander."
   },
   {
     "id": 11,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is frontotemporal dementia?",
-    "ground_truth": "Frontotemporal dementia (FTD) primarily affects the frontal and temporal lobes, leading to marked changes in personality, behaviour, and language rather than memory in the early stages. It often affects people aged 45 to 65 and presents with socially inappropriate behaviour, emotional blunting, or language difficulties."
+    "query": "Why can't I sleep well at night anymore?",
+    "ground_truth": "Sleep problems are very common with Alzheimer's. The condition can disrupt your body clock, making it hard to fall asleep, causing you to wake during the night, or leading to more sleepiness in the day. Having a consistent bedtime routine, spending time in natural light during the day, and staying active can all help. Your doctor can also advise if anything else might help."
   },
   {
     "id": 12,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is mild cognitive impairment?",
-    "ground_truth": "Mild cognitive impairment (MCI) is a stage between the expected cognitive decline of normal aging and the more serious decline of dementia. People with MCI have noticeable memory or thinking problems but can still manage daily activities. MCI may progress to Alzheimer's disease or other dementias, though not all cases do."
+    "query": "I don't feel like eating much lately. Is that related to my memory condition?",
+    "ground_truth": "Yes, changes in appetite and eating habits are common with Alzheimer's. You may forget to eat, feel less hungry, or find it harder to chew and swallow as time goes on. It is important to eat well to keep your body healthy. Your carers can help by offering small, frequent meals and foods that are easy to manage. Let them know if eating feels difficult."
   },
   {
     "id": 13,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What causes Alzheimer's disease at the brain level?",
-    "ground_truth": "Alzheimer's disease is associated with two abnormal protein structures in the brain: amyloid plaques, which are deposits of beta-amyloid protein that build up between nerve cells, and tau tangles, which are twisted fibres of tau protein that accumulate inside nerve cells. These changes disrupt communication between neurons and eventually lead to cell death."
+    "query": "Would going for walks or doing gentle exercise help me feel better?",
+    "ground_truth": "Yes, regular gentle exercise like walking, stretching, or simple chair-based movements can really help. It can lift your mood, reduce restlessness, help you sleep better, and keep your body stronger. It is always best to do activities that feel enjoyable and safe for you, and your carer can join you to make it more fun."
   },
   {
     "id": 14,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "Is Alzheimer's disease hereditary?",
-    "ground_truth": "Genetics play a role in Alzheimer's disease. Having a first-degree relative with Alzheimer's increases risk, but most cases are not directly inherited. The APOE-e4 gene is the strongest known genetic risk factor for late-onset Alzheimer's. Early-onset familial Alzheimer's, which is rarer, is linked to mutations in APP, PSEN1, and PSEN2 genes."
+    "query": "Is there anything I can do to slow down my memory getting worse?",
+    "ground_truth": "While there is no guaranteed way to stop Alzheimer's from progressing, there are things that may help. Staying active, eating healthily, keeping your mind engaged through puzzles or social activities, getting enough sleep, and managing other health conditions like blood pressure can all support your brain health and overall wellbeing."
   },
   {
     "id": 15,
-    "difficulty": "easy",
     "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What are the behavioural symptoms of Alzheimer's disease?",
-    "ground_truth": "Behavioural symptoms of Alzheimer's disease include agitation, aggression, wandering, depression, anxiety, apathy, sleep disturbances, disinhibition, repetitive behaviours, and in later stages, hallucinations and delusions. These symptoms often increase caregiver burden and are a leading reason for nursing home placement."
+    "query": "Sometimes I see or hear things and I am not sure if they are real. Why does this happen?",
+    "ground_truth": "Seeing or hearing things that others cannot, called hallucinations, or strongly believing things that are not true, called delusions, can happen with some types of dementia. They can feel very real and frightening. It is important to tell your carer or doctor when this happens so they can help you feel safe and look at what might be causing it."
   },
   {
     "id": 16,
-    "difficulty": "easy",
-    "expected_category": "communication_guidelines",
-    "query": "How should caregivers communicate with someone who has dementia?",
-    "ground_truth": "Caregivers should use simple, short sentences and speak slowly and clearly. Maintain eye contact, use the person's name, and reduce background noise. Give one instruction at a time, allow time for the person to respond, and use a calm and reassuring tone. Avoid arguing or correcting the person if they are confused."
+    "expected_category": "alzheimers_and_other_sicknesses",
+    "query": "I sometimes get very agitated and upset and I don't know what to do with myself. What helps?",
+    "ground_truth": "Feeling agitated is a common part of Alzheimer's and it can be very distressing. The first step is for your carers to try to identify what might be causing it, such as pain, a noisy environment, or feeling confused. Gentle music, a calm walk, a favourite activity, or a reassuring conversation can all help. If it is very difficult to manage, your doctor can advise on other options."
   },
   {
     "id": 17,
-    "difficulty": "easy",
-    "expected_category": "communication_guidelines",
-    "query": "What does person-centred care mean in dementia?",
-    "ground_truth": "Person-centred care in dementia means treating each person as an individual and focusing on their needs, preferences, life history, and abilities rather than their diagnosis. It involves respecting the person's dignity, involving them in decisions about their care, and maintaining their sense of identity and wellbeing."
+    "expected_category": "alzheimers_and_other_sicknesses",
+    "query": "I still live on my own. Is that safe, and what should I watch out for?",
+    "ground_truth": "Living alone with Alzheimer's can be possible in the early stages with the right support in place, but it does carry risks. These include forgetting to take medication, leaving the cooker on, falling, or getting lost if you go out. Practical things like medication reminders, stove safety devices, good lighting, and regular check-ins from family or a carer can help make things safer. As time goes on, your care needs will likely grow."
   },
   {
     "id": 18,
-    "difficulty": "easy",
-    "expected_category": "communication_guidelines",
-    "query": "Why is communication important in dementia care?",
-    "ground_truth": "Effective communication is essential in dementia care because it helps maintain the person's dignity, reduces distress and frustration, and supports their sense of identity. Poor communication can cause agitation and withdrawal, while good communication can improve wellbeing and quality of life for both the person and their caregiver."
+    "expected_category": "alzheimers_and_other_sicknesses",
+    "query": "Are there activities or groups that can help keep my mind active?",
+    "ground_truth": "Yes. Cognitive stimulation activities, which involve things like word games, discussing everyday topics, or creative activities in a group setting, have been shown to help people with mild to moderate dementia feel better and think more clearly. Many care centres and community organisations offer these sessions. Staying mentally and socially active is one of the best things you can do for your wellbeing."
   },
   {
     "id": 19,
-    "difficulty": "easy",
-    "expected_category": "communication_guidelines",
-    "query": "What is validation therapy in dementia care?",
-    "ground_truth": "Validation therapy is a communication approach that involves acknowledging and respecting the feelings of a person with dementia rather than correcting or arguing with them. It focuses on empathy and emotional connection, meeting the person where they are emotionally and validating their experience even when it does not reflect reality."
+    "expected_category": "alzheimers_and_other_sicknesses",
+    "query": "Does listening to music actually help people with Alzheimer's?",
+    "ground_truth": "Yes, music can be really helpful. The part of the brain that stores music memory is often well preserved in Alzheimer's, which is why a familiar song can bring back feelings and memories even when other things are forgotten. Music can reduce agitation, lift your mood, and help you feel more connected. Listening to songs you love, especially from important times in your life, can be deeply comforting."
   },
   {
     "id": 20,
-    "difficulty": "easy",
-    "expected_category": "communication_guidelines",
-    "query": "How should caregivers handle repetitive questions from a person with dementia?",
-    "ground_truth": "Caregivers should respond patiently each time, as the person with dementia genuinely does not remember asking. Rather than saying the question has already been answered, respond calmly and briefly. Identifying the emotion behind the question, such as anxiety or insecurity, and addressing that feeling can sometimes reduce repetitive questioning."
+    "expected_category": "alzheimers_and_other_sicknesses",
+    "query": "How old are most people when Alzheimer's starts?",
+    "ground_truth": "Most people with Alzheimer's are 65 or older, and the risk increases significantly as you get older. However, it can sometimes start in people in their 40s or 50s, which is less common and often called early-onset Alzheimer's. Age is the biggest risk factor, but it does not mean everyone will develop it as they get older."
   },
   {
     "id": 21,
-    "difficulty": "easy",
     "expected_category": "communication_guidelines",
-    "query": "What activities are beneficial for people with dementia?",
-    "ground_truth": "Activities that are beneficial for people with dementia include reminiscence activities using photos or music, simple craft or gardening tasks, gentle exercise, listening to familiar music, and social engagement. Activities should be adapted to the person's current abilities, interests, and history, and should promote a sense of achievement and enjoyment."
+    "query": "How can I make myself understood when I can't find the right words?",
+    "ground_truth": "It can help to point at things, use gestures, or draw a picture. You can also try describing what you mean in a different way. The people who care for you are there to help, so do not worry about getting the words exactly right. They will be patient and try their best to understand you."
   },
   {
     "id": 22,
-    "difficulty": "easy",
-    "expected_category": "mental_health",
-    "query": "How does caring for someone with dementia affect caregiver mental health?",
-    "ground_truth": "Caregivers of people with dementia are at high risk of depression, anxiety, burnout, and social isolation. The demands of caregiving, including managing behavioural symptoms and progressive loss, can lead to chronic stress and caregiver burden. Support groups, respite care, and psychological support can help protect caregiver mental health."
+    "expected_category": "communication_guidelines",
+    "query": "What does it mean to be cared for in a way that respects who I am?",
+    "ground_truth": "Person-centred care means your carers treat you as an individual, not just someone with a memory condition. They take into account your life story, your likes and dislikes, your values, and what matters to you. You still have a say in your daily life, and your dignity and sense of self are always respected."
   },
   {
     "id": 23,
-    "difficulty": "easy",
-    "expected_category": "mental_health",
-    "query": "What is caregiver burnout?",
-    "ground_truth": "Caregiver burnout is a state of physical, emotional, and mental exhaustion that can occur when caregivers neglect their own needs while caring for a loved one. Signs include feelings of hopelessness, withdrawal from family and friends, loss of interest in activities, and deteriorating physical health."
+    "expected_category": "communication_guidelines",
+    "query": "Why is it important that people talk to me clearly and simply?",
+    "ground_truth": "Because Alzheimer's makes it harder to follow long or complicated sentences, speaking clearly and simply helps you understand what is being said without feeling overwhelmed or confused. When people talk to you calmly and clearly, it reduces frustration and helps you feel more at ease and respected."
   },
   {
     "id": 24,
-    "difficulty": "easy",
-    "expected_category": "mental_health",
-    "query": "What is the link between depression and Alzheimer's disease?",
-    "ground_truth": "Depression is both a risk factor for and a common symptom of Alzheimer's disease. It can occur in the early stages as a response to diagnosis and cognitive decline, and also as a direct result of neurological changes. Treating depression can improve quality of life in people with dementia."
+    "expected_category": "communication_guidelines",
+    "query": "I feel better when people listen to how I feel instead of telling me I am wrong. Why is that?",
+    "ground_truth": "This approach is called validation therapy. Instead of correcting you, the people caring for you focus on understanding your feelings and emotions. Being heard and acknowledged makes you feel safe and valued. Arguing or correcting often causes distress, while empathy and kindness help you feel calm and connected."
   },
   {
     "id": 25,
-    "difficulty": "easy",
-    "expected_category": "mental_health",
-    "query": "What self-care strategies should caregivers of people with dementia use?",
-    "ground_truth": "Caregivers should prioritise their own physical and emotional health by taking regular breaks, maintaining social connections, getting adequate sleep, eating well, and exercising. Seeking help from other family members or professional services, joining support groups, and accessing counselling can reduce caregiver burden and prevent burnout."
+    "expected_category": "communication_guidelines",
+    "query": "I keep asking the same question over and over. I know it must be frustrating. What should people do?",
+    "ground_truth": "Repeating questions is a very common part of Alzheimer's, and it happens because the brain has difficulty holding on to new information. It is not intentional, and the people who care for you understand that. The best thing for them to do is answer calmly each time and try to understand the feeling behind the question, such as whether you are worried or need reassurance."
   },
   {
     "id": 26,
-    "difficulty": "easy",
-    "expected_category": "mental_health",
-    "query": "What is anticipatory grief in the context of dementia care?",
-    "ground_truth": "Anticipatory grief is the grieving process that occurs before an actual death when a loved one has a terminal illness such as dementia. Families may experience loss progressively as the person with dementia loses abilities, personality, and the ability to recognise them. Acknowledging this grief and seeking support is an important part of coping."
+    "expected_category": "communication_guidelines",
+    "query": "What kinds of activities help me feel happy and like myself?",
+    "ground_truth": "Activities that connect with your personal history and interests tend to work best. Things like looking at old photographs, listening to music you love, gentle gardening, simple crafts, or spending time with people you care about can all help. Activities that match your current abilities and bring you a sense of enjoyment and achievement are the most beneficial."
   },
   {
     "id": 27,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What are the behavioural and psychological symptoms of dementia (BPSD)?",
-    "ground_truth": "Behavioural and psychological symptoms of dementia (BPSD) include agitation, aggression, depression, anxiety, apathy, psychosis including hallucinations and delusions, sleep disturbances, wandering, and disinhibition. These symptoms are often more distressing for caregivers than cognitive symptoms and are a leading cause of institutionalisation."
+    "expected_category": "communication_guidelines",
+    "query": "What should my family do when I get very upset or frightened?",
+    "ground_truth": "The most helpful thing is for them to stay calm, speak gently, and not argue with you. They should try to understand what might have caused your distress, like pain, confusion, or something in the environment, and gently redirect your attention to something soothing. A warm tone, a familiar object, or a short walk can help. Physical closeness like a gentle hand-hold may also comfort you if you are happy with that."
   },
   {
     "id": 28,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "How does Alzheimer's disease progress from mild to severe?",
-    "ground_truth": "In the early stage, the person may have mild memory lapses and word-finding difficulties while remaining largely independent. In the middle stage, memory loss and confusion increase and daily tasks become difficult. In the late stage, the person loses the ability to communicate verbally, becomes dependent for all care, and may develop swallowing difficulties and increased vulnerability to infections."
+    "expected_category": "communication_guidelines",
+    "query": "Why do I sometimes resist things like having a bath or getting dressed?",
+    "ground_truth": "This is very understandable. Personal care can feel confusing, overwhelming, or uncomfortable when you are not fully sure what is happening. It helps when carers explain each step gently before doing it, give you choices where possible, keep things consistent, and treat you with patience and respect throughout. If you find something upsetting, it is okay to stop and try again at a better moment."
   },
   {
     "id": 29,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is wandering in dementia and how can it be managed?",
-    "ground_truth": "Wandering in dementia refers to aimless or confused movement that can put the person at risk. It may be caused by boredom, pain, restlessness, or disorientation. Management strategies include ensuring a safe enclosed environment, using door alarms or GPS trackers, providing regular exercise and structured activities, identifying triggers, and registering the person with a safe return programme."
+    "expected_category": "communication_guidelines",
+    "query": "I love looking at old photos and listening to music from my past. Does that help me?",
+    "ground_truth": "Yes, this is called reminiscence and it is very beneficial. Looking at old photos and listening to familiar music can bring back happy memories, improve your mood, and help you feel more like yourself. Long-term memories are often better preserved in Alzheimer's, so connecting with the past through photos, music, and familiar objects is a wonderful way to feel engaged and comforted."
   },
   {
     "id": 30,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What sleep problems are common in Alzheimer's disease and how can they be managed?",
-    "ground_truth": "People with Alzheimer's disease commonly experience disrupted sleep patterns, including difficulty falling asleep, frequent night waking, daytime sleeping, and sundowning. Non-pharmacological management includes maintaining a consistent sleep routine, increasing daytime physical activity, ensuring adequate light exposure during the day, and reducing evening stimulation. Medications should be considered only when behavioural strategies have failed."
+    "expected_category": "communication_guidelines",
+    "query": "Why do I find it easier when people give me one simple step at a time?",
+    "ground_truth": "Alzheimer's affects how the brain processes information, which means long or complicated instructions can become overwhelming. When carers break things down into one small step at a time, give you time to respond, and offer encouragement, it becomes much easier to follow along. You are not slow, your brain just needs a little more time and space."
   },
   {
     "id": 31,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "How does nutrition affect people with Alzheimer's disease?",
-    "ground_truth": "People with Alzheimer's disease are at risk of weight loss and malnutrition as the disease progresses, due to forgetting to eat, loss of appetite, difficulty swallowing, and inability to self-feed. A nutritious diet supports brain health and overall wellbeing. Caregivers should monitor weight, offer small frequent meals, use finger foods where appropriate, and adapt food textures for those with swallowing difficulties."
+    "expected_category": "communication_guidelines",
+    "query": "How should people talk to me differently as my memory gets worse over time?",
+    "ground_truth": "In the earlier stages, simple clear sentences and written reminders work well. As things progress, shorter sentences, gestures, pictures, and familiar topics become more helpful. Later on, your tone of voice, facial expression, and gentle touch become the most important ways to connect and communicate comfort and care. At every stage, your feelings and dignity always matter."
   },
   {
     "id": 32,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is the role of physical exercise in dementia?",
-    "ground_truth": "Regular physical exercise can benefit people with dementia by improving mood, reducing agitation, supporting sleep, maintaining physical function, and potentially slowing cognitive decline. Suitable activities include walking, chair-based exercises, and dancing. Exercise should be adapted to the person's ability and supervised for safety as dementia progresses."
+    "expected_category": "communication_guidelines",
+    "query": "I sometimes ask about my husband even though he passed away years ago. How should my family respond?",
+    "ground_truth": "Rather than repeatedly telling you of the loss, which can cause you fresh grief each time, your family might gently enter your world and acknowledge your feelings. They could say something like 'You miss him a lot, don't you? Can you tell me a happy memory of him?' This approach, called validation therapy, helps you feel heard and loved without causing repeated distress."
   },
   {
     "id": 33,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "How is dementia diagnosed?",
-    "ground_truth": "Dementia is diagnosed through a combination of medical history, cognitive assessments such as the Mini-Mental State Examination (MMSE) or Montreal Cognitive Assessment (MoCA), neurological examination, blood tests to exclude other causes, and brain imaging such as MRI or CT scan. There is no single definitive test and diagnosis requires ruling out other conditions."
+    "expected_category": "communication_guidelines",
+    "query": "I can't find words easily anymore. How can the people around me make me feel comfortable?",
+    "ground_truth": "Even when words become harder to find, the people caring for you can still connect with you through their tone of voice, a warm expression, gentle touch, and simply being present. They do not need to fill every silence. Listening with patience, not rushing you, and responding to your emotions rather than just your words helps you feel understood and safe."
   },
   {
     "id": 34,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is the difference between Alzheimer's disease and normal age-related memory loss?",
-    "ground_truth": "Normal age-related memory loss involves occasional forgetfulness such as misplacing keys or forgetting a name, while the person can still recall the information later. In Alzheimer's disease, memory loss is more persistent and disruptive, affecting the ability to complete familiar tasks, remember recent events, and manage daily life. In Alzheimer's, forgetting recently learned information is an early sign and not merely an age-related change."
+    "expected_category": "communication_guidelines",
+    "query": "I love talking about the old days. Does that actually help me?",
+    "ground_truth": "Yes, very much so. Talking about your past, looking at old photos, listening to music from your younger years, and sharing stories from your life history can bring real joy and comfort. Long-term memories tend to be better preserved in Alzheimer's, so connecting with the past can help you feel more yourself, lift your mood, and strengthen your bond with those who care for you."
   },
   {
     "id": 35,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "Can lifestyle changes reduce the risk of Alzheimer's disease?",
-    "ground_truth": "Evidence suggests that lifestyle changes can reduce the risk of developing dementia. These include regular aerobic exercise, maintaining a heart-healthy diet such as the Mediterranean diet, staying mentally and socially active, not smoking, limiting alcohol, managing cardiovascular risk factors such as high blood pressure and diabetes, and getting adequate sleep."
+    "expected_category": "communication_guidelines",
+    "query": "How can my home be made easier for me to live in with my memory problems?",
+    "ground_truth": "Simple changes can make a big difference. Clear labels on cupboards and doors help you find things. Good lighting reduces confusion. Removing clutter and keeping things in familiar places makes it easier to manage. Contrasting colours on things like plates and floors can help you distinguish objects more easily. Keeping the layout of your home consistent and minimising background noise also helps you feel more at ease."
   },
   {
     "id": 36,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What are hallucinations and delusions in dementia?",
-    "ground_truth": "Hallucinations in dementia involve perceiving things that are not present, most commonly visual, such as seeing people or animals. Delusions are false, fixed beliefs not based on reality, such as believing possessions have been stolen. Both are more common in Lewy body dementia and moderate-to-severe Alzheimer's disease. Management should focus on reassurance and identifying triggers before considering medication."
+    "expected_category": "communication_guidelines",
+    "query": "I get upset when people tell me I am wrong or correct me. Why does that bother me so much?",
+    "ground_truth": "Being corrected, especially repeatedly, can feel embarrassing and upsetting. When you are already dealing with confusion, being told you are wrong can make you feel worse rather than better. In most everyday situations, the people caring for you are encouraged to let small things go, acknowledge your feelings, and gently redirect rather than correct. Your emotional comfort matters more than getting every fact exactly right."
   },
   {
     "id": 37,
-    "difficulty": "medium",
-    "expected_category": "communication_guidelines",
-    "query": "How should a caregiver respond when a person with dementia is agitated or distressed?",
-    "ground_truth": "When a person with dementia is agitated, caregivers should remain calm and avoid raising their voice. Identify potential triggers such as pain, hunger, or environmental factors. Use a gentle tone, offer reassurance, and redirect the person's attention to a calming activity. Avoid arguing or trying to reason during the episode. Physical contact such as a gentle hand-hold may help if the person is receptive."
+    "expected_category": "mental_health",
+    "query": "I worry that caring for me is too much for my family. Is that normal?",
+    "ground_truth": "It is very common to worry about the effect your condition has on your family. Caring for someone with dementia can be tiring and emotionally hard for loved ones. But this does not mean you are a burden. Your family loves you, and there are many support services available to help them so that they do not have to do it all alone."
   },
   {
     "id": 38,
-    "difficulty": "medium",
-    "expected_category": "communication_guidelines",
-    "query": "What non-verbal communication strategies are effective with dementia patients?",
-    "ground_truth": "Effective non-verbal strategies include maintaining eye contact, using a calm and friendly facial expression, speaking at an appropriate distance, using gentle touch to reassure, and using gestures or pointing to supplement words. Tone of voice is particularly important as people with dementia often respond to emotional tone even when they cannot understand words."
+    "expected_category": "mental_health",
+    "query": "What is caregiver burnout and does it affect my family?",
+    "ground_truth": "Caregiver burnout is when the person looking after you becomes so exhausted, physically and emotionally, that their own health starts to suffer. Signs include constant tiredness, feeling hopeless, pulling away from others, and losing enjoyment in life. It is important for your carers to take breaks and get support, so they can continue to care for you well."
   },
   {
     "id": 39,
-    "difficulty": "medium",
-    "expected_category": "communication_guidelines",
-    "query": "How should caregivers approach personal care tasks like bathing with a resistant dementia patient?",
-    "ground_truth": "Caregivers should approach personal care tasks with patience and respect, explaining each step before doing it. Choose a consistent time when the person is calm and cooperative, maintain their privacy and dignity, and allow choices where possible. Using warm water, familiar routines, and a calm voice can reduce resistance. If the person becomes distressed, it may be better to stop and try again later."
+    "expected_category": "mental_health",
+    "query": "I feel sad and low a lot of the time. Is that part of my condition?",
+    "ground_truth": "Yes, depression is both very common and very understandable in people with Alzheimer's. It can come from the emotional impact of the diagnosis and also from changes in the brain itself. Feeling sad does not mean you are weak. Talking to your doctor about how you feel can help, as there are things that can improve your mood and quality of life."
   },
   {
     "id": 40,
-    "difficulty": "medium",
-    "expected_category": "communication_guidelines",
-    "query": "How should caregivers handle a person with dementia who is experiencing hallucinations?",
-    "ground_truth": "Caregivers should not argue with or try to disprove the hallucination, as this can increase distress. Instead, acknowledge the person's feelings by saying something like 'That sounds frightening, but you are safe.' Try to redirect attention to another activity or environment. Check for triggers such as low lighting or reflective surfaces. If hallucinations are causing significant distress or danger, seek medical advice."
+    "expected_category": "mental_health",
+    "query": "How can my family take care of themselves while they are caring for me?",
+    "ground_truth": "It is important for your family to take breaks, stay connected with friends, get enough sleep, eat well, and do things they enjoy. Accepting help from others, joining support groups, and speaking to a counsellor can all make a big difference. When your carers look after themselves, they are better able to look after you."
   },
   {
     "id": 41,
-    "difficulty": "medium",
-    "expected_category": "communication_guidelines",
-    "query": "What is reminiscence therapy and how does it help people with dementia?",
-    "ground_truth": "Reminiscence therapy involves discussing past events, experiences, and memories using prompts such as photographs, music, familiar objects, and videos. It helps people with dementia maintain a sense of identity and self-worth, stimulates long-term memory which is often better preserved than recent memory, and can improve mood and reduce agitation. It also provides an opportunity for meaningful interaction between the person and their caregiver."
+    "expected_category": "mental_health",
+    "query": "Sometimes my family seems sad even though I am still here. Why?",
+    "ground_truth": "What your family is experiencing is sometimes called anticipatory grief. As Alzheimer's progresses, they may grieve the small changes they notice over time, such as moments when you seem different from how you used to be. This is a natural and very difficult kind of grief. It does not mean they love you any less, and it is important for them to have support too."
   },
   {
     "id": 42,
-    "difficulty": "medium",
-    "expected_category": "communication_guidelines",
-    "query": "How should meals be managed for a person with moderate dementia?",
-    "ground_truth": "Meals for a person with moderate dementia should be served in a calm, distraction-free environment using simple place settings. Offer one food at a time, use finger foods to maintain independence, and ensure the food is at a safe temperature. Provide verbal cues and gentle physical prompting if needed. Monitor for swallowing difficulties and adapt food textures accordingly. Maintain a consistent meal routine."
+    "expected_category": "mental_health",
+    "query": "My family looks exhausted. What can help them feel less stressed?",
+    "ground_truth": "It is kind of you to notice and care about your family. There are many things that can help them, including taking regular breaks with the help of respite care, joining a support group with other carers, sharing responsibilities among family members, and speaking to a counsellor. Looking after themselves is not selfish, it helps them to keep looking after you."
   },
   {
     "id": 43,
-    "difficulty": "medium",
-    "expected_category": "communication_guidelines",
-    "query": "What is the best way to give instructions to a person with dementia?",
-    "ground_truth": "Instructions should be given one step at a time using simple, clear language. Avoid long multi-part instructions. Pair verbal instructions with a physical demonstration or gesture. Allow extra time for the person to process and respond. If the person does not understand, repeat the instruction using the same words calmly rather than rephrasing repeatedly. Positive encouragement and praise help reinforce cooperation."
+    "expected_category": "mental_health",
+    "query": "I feel sad sometimes but I cannot always say why. How can people tell that I am not okay?",
+    "ground_truth": "People who care for you can notice changes in how you seem, even when you cannot express it in words. Signs that something might be wrong include becoming quieter than usual, losing interest in things you normally enjoy, eating less, sleeping differently, or seeming tearful or withdrawn. Your carers watch for these changes so they can help you feel better."
   },
   {
     "id": 44,
-    "difficulty": "medium",
     "expected_category": "mental_health",
-    "query": "What strategies can help reduce caregiver stress in dementia care?",
-    "ground_truth": "Strategies to reduce caregiver stress include using respite care to take regular breaks, joining caregiver support groups to share experiences, seeking help from other family members or professional services, maintaining physical health through exercise and adequate sleep, and accessing psychological support such as counselling. Setting realistic expectations and accepting help are also important."
+    "query": "My family member who looks after me seems worn out. What help is available for them?",
+    "ground_truth": "There is a lot of support available for family carers. They can talk to a doctor about how they are feeling, access counselling, join a carer's support group, look into respite care, and connect with local dementia organisations. Family meetings to share the caregiving can also help. It is important that they get the support they need, so they do not carry everything alone."
   },
   {
     "id": 45,
-    "difficulty": "medium",
     "expected_category": "mental_health",
-    "query": "How can depression be recognised in a person with dementia?",
-    "ground_truth": "Depression in a person with dementia may be recognised by persistent low mood, withdrawal from activities they previously enjoyed, increased agitation or tearfulness, changes in appetite and sleep, loss of energy, and expressed hopelessness. Because dementia limits verbal expression, observing behavioural changes is important. Formal screening tools adapted for dementia, such as the Cornell Scale, can assist diagnosis."
+    "query": "I feel anxious and worried a lot. Is that part of having Alzheimer's?",
+    "ground_truth": "Yes, anxiety is very common with Alzheimer's. You might feel restless, unsettled, or worried without always knowing why. Changes in routine, unfamiliar places, or difficulty understanding a situation can all make anxiety worse. Keeping your daily routine consistent, having calm and familiar surroundings, and having reassuring people around you can all help. Let your carer or doctor know how you are feeling."
   },
   {
     "id": 46,
-    "difficulty": "medium",
     "expected_category": "mental_health",
-    "query": "What are the signs that a caregiver needs more support?",
-    "ground_truth": "Signs that a caregiver needs more support include persistent feelings of sadness, hopelessness, or anxiety; neglecting their own health needs; increasing isolation from friends and family; feeling resentful or angry toward the person they care for; sleeping poorly; and feeling that caregiving has consumed all aspects of their life. These signs indicate risk of burnout and should prompt seeking professional and community support."
+    "query": "What is respite care? Does it mean my family needs a break from me?",
+    "ground_truth": "Respite care means someone else steps in to care for you for a short time, either at home, at a day centre, or in a short-stay place, so your regular carer can rest. It does not mean your family loves you any less or wants to get away from you. It is simply a way for them to recharge so they can continue caring for you with love and energy."
   },
   {
     "id": 47,
-    "difficulty": "medium",
     "expected_category": "mental_health",
-    "query": "How does anxiety manifest in people with dementia?",
-    "ground_truth": "Anxiety in people with dementia may manifest as restlessness, pacing, repeated requests for reassurance, clinging behaviour, tearfulness, irritability, and refusal to be left alone. The person may not be able to articulate their worries. Anxiety is often triggered by uncertainty, change in routine, unfamiliar environments, or difficulty understanding their situation. Non-pharmacological approaches such as reassurance, routine, and calm environments are first-line management."
+    "query": "I feel scared and sad since finding out about my diagnosis. Is that normal, and can I get help?",
+    "ground_truth": "Absolutely. Receiving a diagnosis of Alzheimer's or dementia can bring up many difficult feelings including fear, sadness, anger, and grief. These feelings are completely natural and make sense. You do not have to face them alone. Counselling, peer support groups, and talking openly with your family and care team can all help. Early on, you can also take an active part in planning the care you want going forward."
   },
   {
     "id": 48,
-    "difficulty": "medium",
     "expected_category": "mental_health",
-    "query": "What is respite care and why is it important for dementia caregivers?",
-    "ground_truth": "Respite care provides temporary relief to caregivers by having someone else care for the person with dementia, either at home, in a day centre, or in a short-stay residential facility. It is important because it allows caregivers to rest, attend to their own needs, and prevent burnout. Regular respite has been shown to reduce caregiver stress, depression, and the risk of premature placement of the person with dementia into full-time care."
+    "query": "My daughter has been looking after me for years and she seems exhausted and sad. What help can she get?",
+    "ground_truth": "Your daughter deserves support too. She can talk to her doctor about how she is feeling and may benefit from counselling or therapy. Practical help such as arranging regular respite care, connecting with a carer's support group, and sharing responsibilities with other family members can make a real difference. There may also be financial support available for carers. She is not alone in this."
   },
   {
     "id": 49,
-    "difficulty": "medium",
     "expected_category": "mental_health",
-    "query": "How can family conflict be managed when caring for a relative with dementia?",
-    "ground_truth": "Family conflict in dementia caregiving often arises from disagreements about care decisions, unequal sharing of responsibilities, and differing views on the severity of the illness. Strategies include open family meetings to discuss care plans, using a mediator such as a social worker or healthcare professional, assigning specific roles to each family member, and recognising that each person may grieve and respond differently. Seeking family counselling can help where conflict is significant."
+    "query": "I feel guilty about how my condition affects my family. Is that normal?",
+    "ground_truth": "Feeling guilty is very common and very understandable, but it is important to know that your condition is not your fault and you are not a burden. Your family cares for you because they love you. It can help to focus on the moments of connection you still share, to talk about your feelings with someone you trust, or to speak with a counsellor. You are not responsible for having Alzheimer's."
   },
   {
     "id": 50,
-    "difficulty": "hard",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What are the clinical differences between Alzheimer's disease, vascular dementia, and Lewy body dementia in terms of symptoms and progression?",
-    "ground_truth": "Alzheimer's disease presents primarily with memory loss and progresses gradually, caused by amyloid plaques and tau tangles. Vascular dementia follows a stepwise pattern with cognitive decline occurring after strokes, with prominent problems in processing speed and executive function. Lewy body dementia features fluctuating cognition, visual hallucinations, REM sleep behaviour disorder, and Parkinsonism. While all are progressive, Alzheimer's progresses gradually, vascular dementia may plateau between events, and Lewy body dementia fluctuates significantly day to day."
-  },
-  {
-    "id": 51,
-    "difficulty": "hard",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "A person with late-stage Alzheimer's is losing the ability to swallow. What are the risks and how should this be managed?",
-    "ground_truth": "Dysphagia in late-stage Alzheimer's carries risks of aspiration, aspiration pneumonia, choking, and malnutrition. Management includes referral to a speech and language therapist for swallowing assessment, modifying food and fluid textures to reduce aspiration risk, positioning the person upright during meals, monitoring for signs of aspiration such as coughing or wet voice after eating, and involving the care team and family in decisions about the goals of nutrition care as the disease approaches end of life."
-  },
-  {
-    "id": 52,
-    "difficulty": "hard",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "How does frontotemporal dementia differ from Alzheimer's disease in clinical presentation and which population does it typically affect?",
-    "ground_truth": "Frontotemporal dementia (FTD) primarily affects the frontal and temporal lobes, presenting with marked changes in personality, behaviour, and language rather than memory. It typically affects younger people aged 45 to 65, making it a leading cause of young-onset dementia. In contrast, Alzheimer's disease most commonly affects people over 65 and presents initially with memory loss. FTD variants include behavioural-variant FTD, which causes disinhibition and social inappropriateness, and primary progressive aphasia, which causes language deterioration."
-  },
-  {
-    "id": 53,
-    "difficulty": "hard",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What are non-pharmacological approaches to managing agitation in Alzheimer's disease and when should medication be considered?",
-    "ground_truth": "Non-pharmacological approaches should always be tried first and include identifying and addressing triggers such as pain, discomfort, boredom, or environmental factors; maintaining a structured routine; using music therapy, reminiscence, or physical activity; adjusting the environment to reduce overstimulation; and using calm, reassuring communication. Medication should only be considered when behaviours pose a serious risk of harm to the person or others, and all non-pharmacological strategies have been tried. If used, antipsychotics carry significant risks in older people with dementia and require careful monitoring."
-  },
-  {
-    "id": 54,
-    "difficulty": "hard",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "My father has Alzheimer's and lives alone. What safety risks should I be aware of and how can the home environment be made safer?",
-    "ground_truth": "Safety risks for a person with Alzheimer's living alone include falls, getting lost or wandering, leaving the gas or stove on, not recognising medication schedules, fire hazards, and vulnerability to financial exploitation. The home environment can be made safer by installing stove cut-off devices and door alarms, using pill dispensers with alarms, removing trip hazards, installing grab rails, using a GPS tracker or medical alert device, ensuring good lighting, and arranging regular check-in calls or visits. As the disease progresses, living alone may no longer be safe."
-  },
-  {
-    "id": 55,
-    "difficulty": "hard",
-    "expected_category": "communication_guidelines",
-    "query": "How should care teams adapt communication strategies as dementia progresses from mild to severe stages?",
-    "ground_truth": "In mild dementia, communication can rely on verbal explanation with simple sentences and written reminders as support. In moderate dementia, emphasis shifts to shorter sentences, more use of non-verbal cues, gestures, and visual prompts, with topics kept concrete and familiar. In severe dementia, verbal comprehension is greatly reduced and communication relies on tone, facial expression, gentle touch, and physical cues. Throughout all stages, maintaining eye contact, respecting dignity, and responding to emotional expression remain central."
-  },
-  {
-    "id": 56,
-    "difficulty": "hard",
-    "expected_category": "communication_guidelines",
-    "query": "A person with dementia insists their deceased spouse is still alive and becomes distressed when told the truth. How should a caregiver respond?",
-    "ground_truth": "Repeatedly correcting the person will not improve their insight and is likely to cause repeated acute grief and distress. The recommended approach is to enter the person's reality rather than correcting it, acknowledging their feelings and redirecting to a related positive memory or activity. For example, a caregiver might say 'You miss him very much, don't you? Can you tell me something you loved doing together?' This approach, grounded in validation therapy, reduces distress while maintaining dignity and emotional connection."
-  },
-  {
-    "id": 57,
-    "difficulty": "hard",
-    "expected_category": "communication_guidelines",
-    "query": "What communication strategies are most effective for end-of-life care of a person with severe dementia?",
-    "ground_truth": "In end-of-life care for severe dementia, verbal communication is largely replaced by non-verbal approaches. Caregivers and clinicians should use touch, tone of voice, facial expression, and presence to convey comfort and safety. Pain and discomfort should be assessed using observational tools rather than self-report. Decisions about care should be made with family or legal proxy based on the person's previously expressed wishes. Maintaining dignity, minimising distress, and focusing on comfort rather than cure are the guiding principles."
-  },
-  {
-    "id": 58,
-    "difficulty": "hard",
-    "expected_category": "communication_guidelines",
-    "query": "How can caregivers use life history and reminiscence to improve communication with a person in the moderate stage of dementia?",
-    "ground_truth": "Life history work involves gathering detailed information about a person's past, including their occupation, family, hobbies, significant life events, and cultural background. This information can be used to initiate meaningful conversations using long-term memories that are often better preserved than recent ones in Alzheimer's disease. A memory book or life story book with photographs and written prompts can support communication and provide a focus for interactions. Engaging with familiar topics and memories reduces anxiety, supports identity, and strengthens the relationship between the person and their caregiver."
-  },
-  {
-    "id": 59,
-    "difficulty": "hard",
     "expected_category": "mental_health",
-    "query": "What is the psychological impact of a dementia diagnosis on the patient and their family, and how can both be supported?",
-    "ground_truth": "A dementia diagnosis can cause shock, grief, fear, and anger for both the patient and family members. Patients may experience depression, anxiety, and loss of identity, while family members often begin a grief process for the person they knew. Both may benefit from post-diagnostic counselling, peer support groups, access to information about the condition, and legal and financial planning support. Early intervention helps the patient remain involved in planning their care and improves adjustment for the whole family."
-  },
-  {
-    "id": 60,
-    "difficulty": "hard",
-    "expected_category": "mental_health",
-    "query": "A daughter has been the sole caregiver for her mother with Alzheimer's for three years and is now experiencing depression and exhaustion. What support options are available?",
-    "ground_truth": "The daughter should be assessed for depression and referred for psychological support such as cognitive behavioural therapy or counselling if appropriate. Practical support options include arranging regular respite care through day centres or short-stay residential facilities, applying for financial carer support such as carer's allowance, connecting with local and national dementia caregiver organisations and support groups, and having a family meeting to redistribute caregiving responsibilities. Her GP should be involved in coordinating both her own care and a review of her mother's care needs."
-  },
-  {
-    "id": 61,
-    "difficulty": "hard",
-    "expected_category": "mental_health",
-    "query": "How does the burden of dementia caregiving differ across cultural contexts and what does this mean for support services?",
-    "ground_truth": "Dementia caregiving experiences and burden vary significantly across cultural contexts. In some cultures, institutionalising a family member is strongly stigmatised and family caregiving is seen as an obligation, leading to higher rates of caregiver burden without access to formal support. Cultural differences also affect willingness to seek professional help, perceptions of dementia, and preferred communication styles. Support services should be culturally sensitive, provide information in multiple languages, work with community and faith leaders, and offer community-based options rather than solely institutional care pathways."
-  },
-  {
-    "id": 62,
-    "difficulty": "hard",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is the evidence for cognitive stimulation therapy in dementia and how is it delivered?",
-    "ground_truth": "Cognitive stimulation therapy (CST) is one of the most evidence-based non-pharmacological interventions for dementia, recommended by guidelines including NICE. It involves structured group sessions that focus on themed activities designed to stimulate thinking, concentration, and memory, such as word games, current affairs discussions, and creative activities. CST has been shown to improve cognitive function and quality of life in people with mild to moderate dementia, with effects comparable to those of cholinesterase inhibitors. It is typically delivered by trained staff in care settings or community groups."
-  },
-  {
-    "id": 63,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is the role of music therapy in Alzheimer's care?",
-    "ground_truth": "Music therapy uses structured musical experiences to address cognitive, emotional, and social needs in people with Alzheimer's disease. Familiar music can evoke autobiographical memories and emotions even in advanced dementia because music memory is stored in a brain region relatively spared by the disease. Music therapy has been shown to reduce agitation, improve mood, and temporarily enhance cognitive function. It can be used formally by trained therapists or informally by caregivers playing meaningful music during daily activities."
-  },
-  {
-    "id": 64,
-    "difficulty": "medium",
-    "expected_category": "communication_guidelines",
-    "query": "How can caregivers create a dementia-friendly environment at home?",
-    "ground_truth": "A dementia-friendly home environment includes clear signage and labels on doors and cupboards to support orientation, good lighting to reduce shadows and confusion, removing or covering mirrors if they cause distress, using contrasting colours to help distinguish objects such as plates and floors, reducing clutter, keeping the layout familiar and consistent, and minimising background noise. These adjustments help the person navigate independently and reduce confusion and anxiety."
-  },
-  {
-    "id": 65,
-    "difficulty": "medium",
-    "expected_category": "mental_health",
-    "query": "How can caregivers cope with feelings of guilt when caring for a relative with dementia?",
-    "ground_truth": "Guilt is extremely common in dementia caregivers, arising from feelings of not doing enough, having moments of frustration or resentment, or making decisions such as moving a loved one to a care home. Caregivers should be helped to recognise that these feelings are normal and do not reflect bad character. Strategies include reframing thoughts, focusing on what they are doing rather than what they cannot do, sharing feelings with a support group, and accessing counselling. Carers should be reminded that taking care of themselves is necessary to provide good care."
-  },
-  {
-    "id": 66,
-    "difficulty": "easy",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What is mixed dementia?",
-    "ground_truth": "Mixed dementia refers to a condition in which two or more types of dementia occur simultaneously in the same person, most commonly Alzheimer's disease combined with vascular dementia. It is more common than previously thought, particularly in older people. Symptoms reflect characteristics of both types and management targets the risk factors and symptoms of each contributing cause."
-  },
-  {
-    "id": 67,
-    "difficulty": "easy",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "At what age does Alzheimer's disease typically begin?",
-    "ground_truth": "Most people with Alzheimer's disease are aged 65 or older, and the risk increases significantly with age. However, early-onset Alzheimer's disease can occur in people in their 40s or 50s, though this is much rarer and often linked to genetic mutations. Age remains the greatest risk factor for the condition."
-  },
-  {
-    "id": 68,
-    "difficulty": "easy",
-    "expected_category": "communication_guidelines",
-    "query": "Should you correct a person with dementia when they say something wrong?",
-    "ground_truth": "Generally, correcting a person with dementia should be avoided as it can cause distress, embarrassment, and conflict without improving their understanding. Instead, caregivers should acknowledge the person's feelings, redirect the conversation, or gently move on. There are some exceptions where safety is concerned, but in most everyday situations, maintaining a positive interaction is more beneficial than factual correction."
-  },
-  {
-    "id": 69,
-    "difficulty": "easy",
-    "expected_category": "mental_health",
-    "query": "What are the benefits of dementia caregiver support groups?",
-    "ground_truth": "Support groups provide dementia caregivers with a space to share experiences with others who understand their situation, reducing feelings of isolation. They offer practical advice, emotional support, and validation of the challenges of caregiving. Regular attendance has been associated with reduced depression, improved coping skills, and greater confidence in managing caregiving demands. Groups may be in-person or online and are available through dementia charities and community organisations."
-  },
-  {
-    "id": 70,
-    "difficulty": "medium",
-    "expected_category": "alzheimers_and_other_sicknesses",
-    "query": "What legal and financial planning should families consider after a dementia diagnosis?",
-    "ground_truth": "After a dementia diagnosis, families should arrange legal and financial planning while the person still has capacity. This includes setting up a lasting power of attorney for both financial and health and welfare decisions, reviewing wills, discussing advance care planning and advance decisions to refuse treatment, and understanding the costs of future care. Early planning ensures the person's wishes are respected and reduces family conflict and legal complications as the disease progresses."
+    "query": "Is there anywhere my family can go to talk to others who understand what they are going through?",
+    "ground_truth": "Yes. Carer support groups bring together people who are going through similar experiences, giving them a space to share their feelings, learn from each other, and feel less alone. These groups can be found through dementia charities, community organisations, and sometimes online. Many carers find them very helpful for reducing isolation and building confidence in their caregiving."
   }
 ]
