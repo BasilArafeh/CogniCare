@@ -11,7 +11,7 @@ client = OpenAI(api_key=api_key)
 chroma_client = chromadb.Client()
 
 collection = chroma_client.get_or_create_collection(
-    name="communication_guidelines"
+    name="documents_collection"
 )
 
 def embed_text(text):

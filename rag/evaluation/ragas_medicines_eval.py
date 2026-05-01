@@ -56,12 +56,7 @@ import chromadb
 
 from datasets import Dataset
 from ragas import evaluate
-from ragas.metrics.collections import (
-    faithfulness,
-    answer_relevancy,
-    context_recall,
-    # context_precision,  # COST CUT: expensive (per-chunk LLM calls); re-add for final run
-)
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextRecall
 from medicines.chunk import MIN_TOKENS, MAX_TOKENS, OVERLAP_TOKENS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
@@ -71,11 +66,11 @@ from retrieval.reranker import rerank
 load_dotenv()
 
 # ── MLflow ─────────────────────────────────────────────────────────────────────
-mlflow.set_tracking_uri("file:///Users/leensalman/Desktop/gp2/mlruns")
+mlflow.set_tracking_uri("file:///content/drive/MyDrive/cognigp2v2/gp2/mlruns")
 
 # ── CONFIG ─────────────────────────────────────────────────────────────────────
 EVAL_FILE         = os.path.join(os.path.dirname(__file__), "test_questions.json")
-CHROMA_PATH       = os.path.expanduser("/Users/leensalman/Desktop/gp2/CogniCare/rag/vectorstore/chroma_db")
+CHROMA_PATH       = "/content/drive/MyDrive/cognigp2v2/gp2/CogniCare/rag/vectorstore/chroma_db"
 OPENAI_COLLECTION = "medicines_openai15"
 OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY")
 MLFLOW_EXPERIMENT = "CogniCare-RAG-Evaluation"
@@ -106,6 +101,7 @@ HIGH_CHUNK_K_BOOST = 13
 CHUNK_TYPE_MAP = {
     "side_effects":          ["side_effects", "special_populations"],
     "dosage":                ["dosage", "administration"],
+    "administration":        ["administration", "dosage"],
     "interactions_overdose": ["interactions_and_overdose"],
     "storage":               ["storage"],
     "identity":              ["identity_and_usage"],
@@ -114,7 +110,7 @@ CHUNK_TYPE_MAP = {
 # OTC drugs store overdose info inside side_effects, so search both
 CHUNK_TYPE_MAP_IO_EXTENDED = ["interactions_and_overdose", "side_effects", "special_populations"]
 
-GEN_K_EASY = 3
+GEN_K_EASY = 4
 GEN_K_HARD = 6
 
 # ── ARGUMENTS ──────────────────────────────────────────────────────────────────
@@ -248,8 +244,8 @@ Classify this medical question into exactly one category. Output ONLY the catego
 Categories:
 - side_effects      : questions about adverse effects, symptoms caused by the drug,
                       warnings, precautions, tolerability, safety profile
-- dosage            : questions about dose, frequency, how to take, timing,
-                      administration, how to apply a patch or cream
+- dosage            : questions about dose, frequency, how to take, timing
+- administration    : questions about how to apply a patch, cream, or injection, or how to use a device
 - interactions_overdose : questions about drug interactions, overdose, what happens if
                           too much is taken, contraindications, what NOT to take together,
                           safety in specific populations (elderly, pregnant, renal),
@@ -527,29 +523,22 @@ def retrieve(query: str, top_k: int, use_filter: bool = True,
 
 
 # ── SYSTEM PROMPT ──────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """\
-You are a clinical medical assistant. Answer the question using ONLY the context provided below.
+SYSTEM_PROMPT = """You are a clinical medical assistant. Answer the question using ONLY the context provided below.
 
 Rules:
-1. Base your answer exclusively on facts stated in the context.
-   Do NOT infer, assume, or add clinical knowledge beyond what the context contains.
-   If a fact is not in the context, do not state it.
+1. Use ONLY facts stated verbatim or clearly implied in the context. Do not add any clinical knowledge, inferences, or conclusions not explicitly in the context.
 2. Always answer in English.
-3. When the context mentions a brand name, include it as "BrandName (generic_name)"
-   — e.g. "Panadol (acetaminophen)". If only the generic name appears, use only that.
-4. Open your answer by directly addressing the question with the medicine name
-   — e.g. "Exelon (rivastigmine) can cause..." not "This medication can cause...".
-5. Keep your answer to 2–4 sentences. Be direct and complete.
-6. Do not start with "Based on the context..." or "According to the provided information...".
-7. If the context only partially addresses the question, answer what the context supports
-   and state what is missing in one sentence. Only say "This information is not available
-   in the provided context." if the context contains nothing relevant.
-8. Do not add safety warnings, recommendations, or advice beyond what the context states.
-9. For multi-drug questions (interactions, combinations, comparisons): name every drug
-   and state the interaction or finding first, then supporting detail.
-10. Every factual claim in your answer must be directly traceable to the context.
-    Do not fill gaps with general medical knowledge.\
-"""
+3. Include brand name as "BrandName (generic)" e.g. "Panadol (acetaminophen)". If only generic appears, use only that.
+4. If the question is yes/no, begin with "Yes" or "No" followed by the medicine name. e.g. "Yes, Haldol (haloperidol) can cause muscle stiffness and tremor."
+5. Otherwise open by directly addressing the question with the medicine name e.g. "Exelon (rivastigmine) can cause..."
+6. 1-2 sentences for simple questions. 2-3 sentences for complex ones. Never exceed 3 sentences.
+7. Do not start with "Based on the context" or "According to the provided information".
+8. If the context only partially answers the question, state what it does say and stop. Never write sentences about what the context does not contain, does not specify, or does not provide.
+9. Do not add "therefore", "caution is advised", "it is recommended", or any advisory language not explicitly in the context.
+10. For multi-drug questions: name every drug and state the interaction first, then detail.
+11. Never use "therefore", "thus", "hence", "as a result", or draw conclusions beyond what the context explicitly states.
+12. Never write "the context does not", "no information is provided", or "it is unclear". Simply answer what is there and stop.
+13. Never mention drug names that are not in the question or directly relevant to the answer. Do not mention combination product names like ZITUVIMET when asked about a single ingredient like metformin."""
 
 def generate_answer(query: str, contexts: list[str]) -> str:
     context_block = "\n\n---\n\n".join(contexts)
@@ -667,7 +656,7 @@ def build_dataset(top_k):
         data.append({
             "question":     q["query"],
             "answer":       answer,
-            "contexts":     contexts,
+            "contexts":     prompt_contexts,  # FIXED: match what LLM saw
             "ground_truth": q.get("ground_truth", q["expected_generic"]),
         })
 
@@ -677,10 +666,10 @@ def build_dataset(top_k):
 # ── RUN RAGAS ──────────────────────────────────────────────────────────────────
 def run_ragas(dataset):
     # COST CUT 5: context_precision excluded by default (per-chunk LLM calls)
-    metrics_list = [faithfulness, answer_relevancy, context_recall]
+    metrics_list = [Faithfulness(), AnswerRelevancy(), ContextRecall()]
     if args.full_ragas:
-        from ragas.metrics.collections import context_precision
-        metrics_list.append(context_precision)
+        from ragas.metrics import ContextPrecision
+        metrics_list.append(ContextPrecision())
         print("Full RAGAS: context_precision enabled")
 
     result = evaluate(

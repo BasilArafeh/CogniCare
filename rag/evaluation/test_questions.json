@@ -4,14 +4,14 @@
     "difficulty": "easy",
     "query": "What is Aricept used for?",
     "expected_generic": "donepezil",
-    "ground_truth": "Aricept (donepezil) is used to treat symptoms of Alzheimer's disease. It helps improve memory, thinking, and daily functioning."
+    "ground_truth": "Aricept (donepezil) is indicated for the treatment of dementia of the Alzheimer's type. It has demonstrated efficacy in patients with mild, moderate, and severe Alzheimer's disease."
   },
   {
     "id": 2,
     "difficulty": "easy",
     "query": "What condition does Ebixa treat?",
     "expected_generic": "memantine",
-    "ground_truth": "Ebixa (memantine) is used to treat moderate to severe Alzheimer's disease. It works by regulating glutamate activity in the brain involved in learning and memory."
+    "ground_truth": "Ebixa (memantine) is indicated for the treatment of moderate to severe dementia of the Alzheimer's type."
   },
   {
     "id": 3,
@@ -60,14 +60,14 @@
     "difficulty": "easy",
     "query": "What does Zoloft treat?",
     "expected_generic": "sertraline",
-    "ground_truth": "Zoloft (sertraline) is used to treat depression, obsessive-compulsive disorder, panic disorder, and anxiety disorders."
+    "ground_truth": "Zoloft (sertraline) is indicated for the treatment of major depressive disorder, obsessive-compulsive disorder, panic disorder, and social anxiety disorder in adults."
   },
   {
     "id": 10,
     "difficulty": "easy",
     "query": "What is Nexium prescribed for?",
     "expected_generic": "esomeprazole",
-    "ground_truth": "Nexium (esomeprazole) is used to treat acid reflux, heartburn, and stomach ulcers by reducing stomach acid production."
+    "ground_truth": "Nexium (esomeprazole) is prescribed for the treatment of frequent heartburn that occurs 2 or more days a week. It is not intended for immediate relief and may take 1 to 4 days for full effect."
   },
   {
     "id": 11,
@@ -88,195 +88,405 @@
     "difficulty": "easy",
     "query": "Can Lipitor cause muscle pain?",
     "expected_generic": "atorvastatin",
-    "ground_truth": "Yes, atorvastatin can cause muscle pain, tenderness, or weakness. In rare cases it can lead to a serious muscle condition called rhabdomyolysis."
+    "ground_truth": "Yes, atorvastatin (Lipitor) can cause muscle pain. Musculoskeletal pain, muscle spasms, and myalgia are listed as adverse effects."
   },
   {
     "id": 14,
     "difficulty": "easy",
     "query": "What is the maximum dose of Panadol per day for adults?",
     "expected_generic": "acetaminophen",
-    "ground_truth": "The maximum daily dose of acetaminophen for adults is 4000 mg, though lower limits are often recommended for elderly patients or those with liver concerns."
+    "ground_truth": "The maximum dose of Panadol (acetaminophen) for adults is 6 gelcaps in 24 hours unless directed by a doctor. Do not use more than directed."
   },
   {
     "id": 15,
     "difficulty": "easy",
     "query": "Should Glucophage be taken before or after meals?",
     "expected_generic": "metformin",
-    "ground_truth": "Glucophage (metformin) should be taken with or after meals to reduce gastrointestinal side effects such as nausea and diarrhea."
+    "ground_truth": "Glucophage (metformin) should be taken with meals."
   },
   {
     "id": 16,
     "difficulty": "easy",
     "query": "Should Lipitor be taken at night or in the morning?",
     "expected_generic": "atorvastatin",
-    "ground_truth": "Atorvastatin can be taken at any time of day but should be taken consistently at the same time each day."
+    "ground_truth": "Atorvastatin (Lipitor) can be taken once daily at any time of the day, with or without food."
   },
   {
     "id": 17,
     "difficulty": "easy",
     "query": "What are the overdose symptoms of metformin?",
     "expected_generic": "metformin",
-    "ground_truth": "Metformin overdose can cause lactic acidosis, a serious condition with symptoms including muscle pain, weakness, difficulty breathing, and stomach discomfort. Seek emergency care immediately."
+    "ground_truth": "Metformin overdose can lead to hypoglycemia, reported in approximately 10% of cases. Lactic acidosis has also been reported in metformin overdose cases."
   },
   {
     "id": 18,
     "difficulty": "easy",
     "query": "What are the signs of too much Warfarin in the blood?",
     "expected_generic": "warfarin",
-    "ground_truth": "Signs of warfarin overdose include unusual bruising, prolonged bleeding from cuts, blood in urine or stool, coughing up blood, or severe headache. Seek medical attention immediately."
+    "ground_truth": "Signs of too much warfarin include bleeding such as blood in stools or urine, hematuria, excessive menstrual bleeding, and unexplained bruising."
   },
   {
     "id": 19,
     "difficulty": "easy",
     "query": "What medications should not be taken with Warfarin?",
     "expected_generic": "warfarin",
-    "ground_truth": "Warfarin interacts with many medications including aspirin, ibuprofen, antibiotics, antifungals, and certain herbal supplements. These can increase or decrease its blood-thinning effect. Always check with a pharmacist before starting any new medication."
+    "ground_truth": "Warfarin should not be taken with drugs that increase bleeding risk, antibiotics, antifungals, and inhibitors or inducers of CYP2C9, CYP1A2, or CYP3A4 enzymes, as these can increase or decrease its blood-thinning effect."
   },
   {
     "id": 20,
     "difficulty": "easy",
     "query": "Can Plavix and aspirin be taken together?",
     "expected_generic": "clopidogrel",
-    "ground_truth": "Clopidogrel and aspirin are sometimes prescribed together for certain heart conditions, but the combination increases bleeding risk and should only be used under medical supervision."
+    "ground_truth": "Clopidogrel (Plavix) can be taken with aspirin, as clinical trials have evaluated this combination. However, the combination increases bleeding risk compared to placebo with aspirin alone."
   },
   {
     "id": 21,
+    "difficulty": "easy",
+    "query": "What is Seroquel used for?",
+    "expected_generic": "quetiapine",
+    "ground_truth": "Quetiapine (Seroquel) is an atypical antipsychotic indicated for the treatment of schizophrenia, bipolar I disorder manic episodes, and bipolar disorder depressive episodes."
+  },
+  {
+    "id": 22,
+    "difficulty": "easy",
+    "query": "What is Lyrica prescribed for?",
+    "expected_generic": "pregabalin",
+    "ground_truth": "Lyrica (pregabalin) is indicated for the management of neuropathic pain associated with diabetic peripheral neuropathy, postherpetic neuralgia, fibromyalgia, and as adjunctive therapy for partial-onset seizures."
+  },
+  {
+    "id": 23,
+    "difficulty": "easy",
+    "query": "What is Synthroid used to treat?",
+    "expected_generic": "levothyroxine",
+    "ground_truth": "Synthroid (levothyroxine) is indicated as replacement therapy for hypothyroidism in adult and pediatric patients, including neonates."
+  },
+  {
+    "id": 24,
+    "difficulty": "easy",
+    "query": "What is Eliquis used for?",
+    "expected_generic": "apixaban",
+    "ground_truth": "Apixaban (Eliquis) is a factor Xa inhibitor indicated to reduce the risk of stroke and systemic embolism in patients with nonvalvular atrial fibrillation, and for the prophylaxis and treatment of deep vein thrombosis and pulmonary embolism."
+  },
+  {
+    "id": 25,
+    "difficulty": "easy",
+    "query": "What is Zofran used for?",
+    "expected_generic": "ondansetron",
+    "ground_truth": "Ondansetron (Zofran) is indicated for the prevention of nausea and vomiting associated with highly emetogenic and moderately emetogenic cancer chemotherapy, and with radiotherapy."
+  },
+  {
+    "id": 26,
+    "difficulty": "easy",
+    "query": "How should Synthroid be taken?",
+    "expected_generic": "levothyroxine",
+    "ground_truth": "Levothyroxine (Synthroid) should be administered once daily, preferably on an empty stomach, one-half to one hour before breakfast with a full glass of water."
+  },
+  {
+    "id": 27,
+    "difficulty": "easy",
+    "query": "How should Lantus insulin be stored?",
+    "expected_generic": "insulin glargine",
+    "ground_truth": "Lantus (insulin glargine) should be protected from heat and light and must not be frozen. In-use prefilled pens must be used within 28 days or discarded, even if they still contain insulin."
+  },
+  {
+    "id": 28,
+    "difficulty": "easy",
+    "query": "Can aspirin be given to children with flu symptoms?",
+    "expected_generic": "aspirin",
+    "ground_truth": "No, aspirin should not be given to children and teenagers who have or are recovering from chicken pox or flu-like symptoms, due to the risk of Reye's syndrome, a rare but serious illness."
+  },
+  {
+    "id": 29,
+    "difficulty": "easy",
+    "query": "What is the starting dose of Norvasc for adults?",
+    "expected_generic": "amlodipine",
+    "ground_truth": "The recommended starting dose of amlodipine (Norvasc) for adults is 5 mg once daily, with a maximum dose of 10 mg once daily. Small, fragile, or elderly patients may be started on 2.5 mg once daily."
+  },
+  {
+    "id": 30,
+    "difficulty": "easy",
+    "query": "What is Lasix stored at?",
+    "expected_generic": "furosemide",
+    "ground_truth": "Furosemide (Lasix) should be stored at 20 to 25 degrees Celsius and protected from light in well-closed, light-resistant containers. Discolored tablets should not be dispensed."
+  },
+  {
+    "id": 31,
     "difficulty": "medium",
     "query": "What are the common side effects of Aricept in Alzheimer's patients?",
     "expected_generic": "donepezil",
     "ground_truth": "Common side effects of donepezil include nausea, diarrhea, insomnia, vomiting, and muscle cramps, particularly when starting treatment or increasing the dose."
   },
   {
-    "id": 22,
+    "id": 32,
     "difficulty": "medium",
     "query": "Can Ebixa cause dizziness in elderly patients with Alzheimer's?",
     "expected_generic": "memantine",
     "ground_truth": "Yes, memantine can cause dizziness, headache, and confusion as side effects, which may be more pronounced in elderly patients."
   },
   {
-    "id": 23,
+    "id": 33,
     "difficulty": "medium",
     "query": "Can Haldol cause stiffness or shaking in dementia patients?",
     "expected_generic": "haloperidol",
-    "ground_truth": "Yes, haloperidol can cause movement-related side effects including muscle stiffness, tremor, and restlessness, and these are particularly common and serious in elderly patients with dementia."
+    "ground_truth": "Haloperidol (Haldol) can cause tardive dyskinesia, characterized by potentially irreversible involuntary dyskinetic movements including stiffness or shaking. Elderly patients with dementia are at greater risk."
   },
   {
-    "id": 24,
+    "id": 34,
     "difficulty": "medium",
     "query": "What are the side effects of Concor for elderly heart patients?",
     "expected_generic": "bisoprolol",
-    "ground_truth": "Bisoprolol may cause fatigue, dizziness, cold extremities, and slowed heart rate. In diabetic patients it can mask symptoms of low blood sugar."
+    "ground_truth": "Bisoprolol (Concor) can cause visual disturbances, dizziness, fatigue, bradycardia, and respiratory issues such as bronchospasm in elderly heart patients."
   },
   {
-    "id": 25,
+    "id": 35,
     "difficulty": "medium",
     "query": "What side effects does Zoloft cause in elderly patients?",
     "expected_generic": "sertraline",
-    "ground_truth": "Common side effects of sertraline include nausea, diarrhea, insomnia, and dizziness. In elderly patients it may also increase the risk of falls and low sodium levels."
+    "ground_truth": "In elderly patients, Zoloft (sertraline) adverse events include urinary tract infection. As with other SSRIs, monitoring is recommended due to the potential for adverse reactions in geriatric populations."
   },
   {
-    "id": 26,
+    "id": 36,
     "difficulty": "medium",
     "query": "How should Aricept be taken for Alzheimer's disease?",
     "expected_generic": "donepezil",
     "ground_truth": "Donepezil is taken once daily, with or without food. It is often taken at bedtime to help reduce gastrointestinal side effects."
   },
   {
-    "id": 27,
-    "difficulty": "medium",
-    "query": "How do I apply the Exelon patch correctly for my mother with Alzheimer's?",
-    "expected_generic": "rivastigmine",
-    "ground_truth": "The Exelon patch should be applied once daily to clean, dry, hairless skin on the back, upper arm, or chest. Rotate the application site daily and avoid reusing the same spot within 14 days."
-  },
-  {
-    "id": 28,
+    "id": 37,
     "difficulty": "medium",
     "query": "What is the starting dose of Ebixa for an Alzheimer's patient?",
     "expected_generic": "memantine",
     "ground_truth": "Memantine is typically started at 5 mg once daily and gradually increased over several weeks to the usual maintenance dose of 10 mg twice daily."
   },
   {
-    "id": 29,
+    "id": 38,
     "difficulty": "medium",
     "query": "What is the correct dose of Brufen for a 70-year-old patient?",
     "expected_generic": "ibuprofen",
-    "ground_truth": "Ibuprofen should be used at the lowest effective dose in elderly patients. They are at higher risk of stomach bleeding and kidney problems, so a doctor should determine the appropriate dose."
+    "ground_truth": "Ibuprofen (Brufen) should be taken at 1 tablet every 4 to 6 hours while symptoms persist, with a maximum of 3 tablets in 24 hours unless directed by a doctor."
   },
   {
-    "id": 30,
+    "id": 39,
     "difficulty": "medium",
     "query": "What are the signs of digoxin toxicity I should watch for?",
     "expected_generic": "digoxin",
-    "ground_truth": "Signs of digoxin toxicity include nausea, vomiting, visual disturbances such as seeing yellow-green halos, irregular heartbeat, and confusion. Contact a doctor immediately if these occur."
+    "ground_truth": "Signs of digoxin toxicity include cardiac arrhythmias and gastrointestinal disturbances such as nausea, vomiting, and abdominal pain. Contact a doctor immediately if these occur."
   },
   {
-    "id": 31,
-    "difficulty": "medium",
-    "query": "Is Xanax safe for an elderly patient with Alzheimer's disease?",
-    "expected_generic": "alprazolam",
-    "ground_truth": "Alprazolam is generally not recommended for elderly Alzheimer's patients. It can worsen confusion, increase fall risk, cause excessive sedation, and carries a risk of dependence."
-  },
-  {
-    "id": 32,
-    "difficulty": "medium",
-    "query": "Can Lipitor be taken together with amiodarone?",
-    "expected_generic": "atorvastatin",
-    "ground_truth": "Taking atorvastatin with amiodarone increases the risk of muscle side effects. The dose of atorvastatin may need to be limited when used alongside amiodarone."
-  },
-  {
-    "id": 33,
+    "id": 40,
     "difficulty": "medium",
     "query": "What drugs interact dangerously with Digoxin?",
     "expected_generic": "digoxin",
-    "ground_truth": "Digoxin interacts with many drugs including amiodarone, calcium channel blockers, and certain antibiotics, which can raise digoxin levels and increase the risk of toxicity."
+    "ground_truth": "Digoxin interacts with many drugs including amiodarone, which increases digoxin concentrations by 70%, and dronedarone, which increases concentrations by 150%. Clarithromycin, erythromycin, and itraconazole also significantly increase digoxin levels and require dose reduction."
   },
   {
-    "id": 34,
+    "id": 41,
     "difficulty": "medium",
     "query": "What should not be taken together with lisinopril?",
     "expected_generic": "lisinopril",
     "ground_truth": "Lisinopril should not be combined with potassium-sparing diuretics, potassium supplements, or other ACE inhibitors. NSAIDs such as ibuprofen may reduce its effectiveness and increase kidney risk."
   },
   {
-    "id": 35,
+    "id": 42,
     "difficulty": "medium",
     "query": "What happens if someone takes too much Panadol?",
     "expected_generic": "acetaminophen",
     "ground_truth": "An acetaminophen overdose can cause serious liver damage. Seek immediate medical attention even if there are no symptoms at first, as damage may develop over hours."
   },
   {
-    "id": 36,
-    "difficulty": "medium",
-    "query": "Can Glucophage be taken with heart failure medication?",
-    "expected_generic": "metformin",
-    "ground_truth": "Metformin should be used cautiously in patients with heart failure. In severe or unstable cases it may be contraindicated due to the risk of lactic acidosis. A doctor should assess suitability."
-  },
-  {
-    "id": 37,
+    "id": 43,
     "difficulty": "medium",
     "query": "Does Tegretol interact with other medications an Alzheimer's patient might be taking?",
     "expected_generic": "carbamazepine",
-    "ground_truth": "Carbamazepine has many drug interactions. It can reduce the effectiveness of antidepressants, antipsychotics, and blood thinners that are commonly prescribed to Alzheimer's patients. Regular blood level monitoring is required."
+    "ground_truth": "Carbamazepine (Tegretol) can interact with several medications, potentially decreasing the levels of drugs such as acetaminophen, alprazolam, citalopram, and donepezil."
   },
   {
-    "id": 38,
+    "id": 44,
     "difficulty": "medium",
     "query": "How many times a day should Reminyl be taken for Alzheimer's?",
     "expected_generic": "galantamine",
-    "ground_truth": "Galantamine is typically taken twice daily with morning and evening meals."
+    "ground_truth": "Galantamine (Reminyl) extended-release capsules are taken once daily in the morning, preferably with food. The recommended starting dose is 8 mg/day."
   },
   {
-    "id": 39,
+    "id": 45,
     "difficulty": "medium",
     "query": "Can my elderly father with dementia take Ativan every night for sleep?",
     "expected_generic": "lorazepam",
-    "ground_truth": "Lorazepam is generally not recommended for daily long-term use in elderly patients with dementia. It can worsen confusion, increase fall risk, cause dependence, and suppress breathing."
+    "ground_truth": "Lorazepam (Ativan) should be used with caution in elderly patients with dementia, as they are more susceptible to sedative effects. The initial dosage should not exceed 2 mg in geriatric patients."
   },
   {
-    "id": 40,
+    "id": 46,
     "difficulty": "medium",
     "query": "My grandmother with Alzheimer's takes lisinopril for blood pressure and has developed a persistent dry cough. Could this be from her medication?",
     "expected_generic": "lisinopril",
-    "ground_truth": "Yes, a persistent dry cough is a well-known side effect of lisinopril and other ACE inhibitors. A doctor may consider switching her to an alternative blood pressure medication if the cough is bothersome."
+    "ground_truth": "Yes, lisinopril can cause a persistent dry cough due to inhibition of bradykinin degradation. This is a recognised side effect of ACE inhibitors."
+  },
+  {
+    "id": 47,
+    "difficulty": "medium",
+    "query": "Is Seroquel safe for elderly patients with dementia?",
+    "expected_generic": "quetiapine",
+    "ground_truth": "No, quetiapine (Seroquel) carries an increased risk of mortality in elderly patients with dementia-related psychosis, as well as an increased risk of cerebrovascular adverse reactions including stroke."
+  },
+  {
+    "id": 48,
+    "difficulty": "medium",
+    "query": "Can Risperdal cause movement problems in elderly dementia patients?",
+    "expected_generic": "risperidone",
+    "ground_truth": "Yes, risperidone (Risperdal) is associated with increased mortality and cerebrovascular adverse events including stroke in elderly patients with dementia-related psychosis. Movement-related side effects are also a concern."
+  },
+  {
+    "id": 49,
+    "difficulty": "medium",
+    "query": "What are the side effects of Zyprexa?",
+    "expected_generic": "olanzapine",
+    "ground_truth": "The most common adverse reactions associated with oral olanzapine monotherapy in schizophrenia include postural hypotension, constipation, weight gain, dizziness, and personality disorder."
+  },
+  {
+    "id": 50,
+    "difficulty": "medium",
+    "query": "What is the dose of Cipralex for depression in adults?",
+    "expected_generic": "escitalopram",
+    "ground_truth": "The recommended dosage of escitalopram (Cipralex) for major depressive disorder in adults is 10 mg once daily, with a maximum dose of 20 mg once daily."
+  },
+  {
+    "id": 51,
+    "difficulty": "medium",
+    "query": "Can Rivotril be taken with opioid painkillers?",
+    "expected_generic": "clonazepam",
+    "ground_truth": "No, concomitant use of clonazepam (Rivotril) and opioids may result in profound sedation, respiratory depression, coma, and death. This combination should be reserved only for patients with no adequate alternatives."
+  },
+  {
+    "id": 52,
+    "difficulty": "medium",
+    "query": "Does Cozaar interact with ibuprofen?",
+    "expected_generic": "losartan",
+    "ground_truth": "Yes, NSAIDs such as ibuprofen can increase the risk of renal impairment when taken with losartan (Cozaar) and may also reduce its diuretic, natriuretic, and antihypertensive effects."
+  },
+  {
+    "id": 53,
+    "difficulty": "medium",
+    "query": "What are the side effects of Aldactone?",
+    "expected_generic": "spironolactone",
+    "ground_truth": "Spironolactone (Aldactone) can cause hyperkalemia, hypotension, worsening renal function, electrolyte and metabolic abnormalities, and gynecomastia."
+  },
+  {
+    "id": 54,
+    "difficulty": "medium",
+    "query": "Can Neurontin be taken with morphine?",
+    "expected_generic": "gabapentin",
+    "ground_truth": "Caution is warranted when combining gabapentin (Neurontin) with opioids such as morphine, as respiratory depression and sedation, sometimes resulting in death, have been reported with this combination. Morphine may also increase gabapentin concentrations."
+  },
+  {
+    "id": 55,
+    "difficulty": "medium",
+    "query": "How should Xarelto be stored?",
+    "expected_generic": "rivaroxaban",
+    "ground_truth": "Rivaroxaban (Xarelto) tablets should be stored at room temperature between 20 and 25 degrees Celsius. The granules and reconstituted suspension should not be frozen."
+  },
+  {
+    "id": 56,
+    "difficulty": "medium",
+    "query": "Can Tegretol reduce the effectiveness of Eliquis?",
+    "expected_generic": "apixaban",
+    "ground_truth": "Yes, carbamazepine (Tegretol) is a combined P-gp and strong CYP3A4 inducer that decreases apixaban (Eliquis) blood levels. Concomitant use should be avoided as it may reduce the anticoagulant effect and increase the risk of stroke."
+  },
+  {
+    "id": 57,
+    "difficulty": "medium",
+    "query": "What are the side effects of Tramal?",
+    "expected_generic": "tramadol",
+    "ground_truth": "Tramadol (Tramal) carries risks of addiction, abuse, and misuse, as well as life-threatening respiratory depression. Other risks include serotonin syndrome and neonatal opioid withdrawal syndrome."
+  },
+  {
+    "id": 58,
+    "difficulty": "medium",
+    "query": "Can Glucophage be taken with heart failure medication?",
+    "expected_generic": "metformin",
+    "ground_truth": "Metformin (Glucophage) is associated with heart failure as a potential adverse reaction."
+  },
+  {
+    "id": 59,
+    "difficulty": "hard",
+    "query": "My father has Alzheimer's and takes Aricept. He was just prescribed Tegretol for seizures. Should I be concerned about an interaction?",
+    "expected_generic": "carbamazepine",
+    "ground_truth": "Yes, carbamazepine (Tegretol) is a CYP3A4 inducer that decreases plasma levels of donepezil (Aricept), which may reduce its effectiveness in managing Alzheimer's symptoms. Dose monitoring and adjustment may be necessary."
+  },
+  {
+    "id": 60,
+    "difficulty": "hard",
+    "query": "My mother takes Risperdal for agitation and Prozac for depression. Is there a drug interaction I should know about?",
+    "expected_generic": "risperidone",
+    "ground_truth": "Yes, fluoxetine (Prozac) is a CYP2D6 enzyme inhibitor that increases plasma concentrations of risperidone (Risperdal). The risperidone dose should be reduced and should not exceed 8 mg per day when used with fluoxetine."
+  },
+  {
+    "id": 61,
+    "difficulty": "hard",
+    "query": "A patient with Alzheimer's is taking Aricept and has been prescribed Valium for anxiety. What risks should the caregiver know about?",
+    "expected_generic": "donepezil",
+    "ground_truth": "Donepezil (Aricept) as a cholinesterase inhibitor may interfere with anticholinergic or CNS-depressant medications. Diazepam (Valium) may potentiate orthostatic hypotension and sedation when combined with antipsychotics and CNS depressants. Caution and monitoring are advised."
+  },
+  {
+    "id": 62,
+    "difficulty": "hard",
+    "query": "Can a patient on Warfarin also take metronidazole for an infection?",
+    "expected_generic": "warfarin",
+    "ground_truth": "Caution is required, as metronidazole is a CYP2C9 inhibitor that can increase warfarin exposure and raise the INR, increasing bleeding risk. Close INR monitoring is required when starting or stopping metronidazole in a patient taking warfarin."
+  },
+  {
+    "id": 63,
+    "difficulty": "hard",
+    "query": "My patient takes Digoxin and was just started on Amiodarone. What monitoring is needed?",
+    "expected_generic": "digoxin",
+    "ground_truth": "Amiodarone increases digoxin concentrations by approximately 70%. Serum digoxin concentrations should be measured before initiating amiodarone, and the digoxin dose should be reduced by approximately 30 to 50 percent with continued monitoring."
+  },
+  {
+    "id": 64,
+    "difficulty": "hard",
+    "query": "Can a patient with Alzheimer's on Seroquel also take Tegretol for epilepsy?",
+    "expected_generic": "quetiapine",
+    "ground_truth": "Carbamazepine (Tegretol) is a strong CYP3A4 inducer that significantly increases quetiapine (Seroquel) clearance. If Tegretol is added, the quetiapine dose may need to be increased up to 5-fold, and the dose must be reduced again if Tegretol is discontinued."
+  },
+  {
+    "id": 65,
+    "difficulty": "hard",
+    "query": "My elderly mother with heart failure takes Lasix and Aldactone together. Is there anything dangerous about this combination?",
+    "expected_generic": "spironolactone",
+    "ground_truth": "Combining spironolactone (Aldactone) with other agents that increase serum potassium can lead to hyperkalemia. Furosemide (Lasix) is a loop diuretic that may offset this risk, but the combination requires monitoring of potassium levels and renal function."
+  },
+  {
+    "id": 66,
+    "difficulty": "hard",
+    "query": "A diabetic patient on insulin also takes lisinopril. What interaction should be monitored?",
+    "expected_generic": "insulin glargine",
+    "ground_truth": "ACE inhibitors such as lisinopril are among the drugs that may increase the risk of hypoglycemia when used with insulin. Patients receiving insulin with an ACE inhibitor may require dose adjustments and closer blood glucose monitoring."
+  },
+  {
+    "id": 67,
+    "difficulty": "hard",
+    "query": "Can a patient on Eliquis take Tegretol for seizures?",
+    "expected_generic": "apixaban",
+    "ground_truth": "No, carbamazepine (Tegretol) is a combined P-gp and strong CYP3A4 inducer that decreases apixaban (Eliquis) blood levels and should be avoided. Concomitant use may result in insufficient anticoagulation and increased risk of stroke."
+  },
+  {
+    "id": 68,
+    "difficulty": "hard",
+    "query": "My father takes Neurontin for nerve pain and was just prescribed an opioid. Is this combination safe?",
+    "expected_generic": "gabapentin",
+    "ground_truth": "No, the combination of gabapentin (Neurontin) and opioids increases the risk of respiratory depression and sedation, which can sometimes be fatal. This combination should only be used with extreme caution and close monitoring."
+  },
+  {
+    "id": 69,
+    "difficulty": "hard",
+    "query": "A patient with atrial fibrillation takes Digoxin and is also started on Cozaar for blood pressure. What should be monitored?",
+    "expected_generic": "digoxin",
+    "ground_truth": "Losartan (Cozaar) can increase digoxin concentrations by 20 to 49%. Serum digoxin levels should be measured before starting losartan and monitored closely, with dose adjustments made as necessary."
+  },
+  {
+    "id": 70,
+    "difficulty": "hard",
+    "query": "Can Rivotril and Tramal be prescribed together for a patient with chronic pain and anxiety?",
+    "expected_generic": "clonazepam",
+    "ground_truth": "The combination of clonazepam (Rivotril) and tramadol (Tramal) is high risk. Benzodiazepines combined with opioids can cause profound sedation, respiratory depression, coma, and death. This combination should only be used when there are no adequate alternatives and with close monitoring."
   }
 ]

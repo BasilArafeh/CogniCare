@@ -224,6 +224,88 @@ def bm25_retrieve(
     return [docs[i] for i in indices], [metas[i] for i in indices]
 
 
+# ── DOCUMENT FULL-CORPUS BM25 ─────────────────────────────────────────────────
+# Unlike the per-drug medicine index, documents are indexed as a single corpus
+# because there is no "generic_name" equivalent to filter on before scoring.
+# The index is built once per (collection_name, chroma_path) pair and cached.
+
+@lru_cache(maxsize=8)
+def _build_doc_index(
+    collection_name: str,
+    chroma_path: str,
+) -> tuple[BM25, list[str], list[dict]] | None:
+    """
+    Fetch ALL chunks from a document collection and build one BM25 index.
+    Cached so the index is built only once per collection path.
+    """
+    try:
+        client     = chromadb.PersistentClient(path=chroma_path)
+        collection = client.get_collection(collection_name)
+    except Exception:
+        return None
+
+    try:
+        result = collection.get(include=["documents", "metadatas"])
+    except Exception:
+        return None
+
+    docs  = result["documents"]
+    metas = result["metadatas"]
+
+    if not docs:
+        return None
+
+    index = BM25(docs)
+    return index, docs, metas
+
+
+def bm25_retrieve_docs(
+    query: str,
+    category: str | None,
+    n: int,
+    *,
+    collection_name: str,
+    chroma_path: str,
+) -> tuple[list[str], list[dict]]:
+    """
+    BM25 sparse retrieval over a full document corpus.
+
+    Parameters
+    ----------
+    query           : search query (ideally rewritten for precision).
+    category        : optional metadata category value to prioritise
+                      (e.g. "alzheimers_and_other_sicknesses"). Falls back
+                      to full-corpus results if fewer than n//2 chunks match.
+    n               : number of results to return.
+    collection_name : ChromaDB collection name.
+    chroma_path     : path to the ChromaDB persistent store.
+
+    Returns
+    -------
+    (docs, metas) — parallel lists of length <= n.
+    """
+    cached = _build_doc_index(collection_name, chroma_path)
+    if cached is None:
+        return [], []
+
+    index, docs, metas = cached
+
+    # Score all chunks, get extra candidates to allow category filtering
+    candidate_indices = index.top_n(query, min(n * 4, len(docs)))
+
+    if category:
+        filtered = [i for i in candidate_indices
+                    if metas[i].get("category", "") == category]
+        # Fall back to unfiltered if category filter leaves too few results
+        if len(filtered) < max(2, n // 2):
+            filtered = candidate_indices
+        indices = filtered[:n]
+    else:
+        indices = candidate_indices[:n]
+
+    return [docs[i] for i in indices], [metas[i] for i in indices]
+
+
 # ── HELPERS re-exported for pipeline ──────────────────────────────────────────
 def cid(doc: str) -> str:
     """MD5 fingerprint — used by the pipeline for cross-list deduplication."""

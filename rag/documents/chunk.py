@@ -43,7 +43,7 @@ def group_by_sections(elements):
 def is_valid_chunk(text):
     words = text.split()
 
-    if len(words) < 80:
+    if len(words) < 40:
         return False
     if len(words) > 400:
         return False

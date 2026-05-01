@@ -12,12 +12,12 @@ from documents.chunk import chunk_elements
 from documents.enrich import process_chunks as llm_enrich_chunks
 
 DATA_FOLDERS = [
-    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/communication_guidelines",
-    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/mental_health",
-    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/alzheimers_and_other_sicknesses"
+    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/documents/communication_guidelines",
+    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/documents/mental_health",
+    "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/raw/documents/alzheimers_and_other_sicknesses"
 ]
 
-OUTPUT_PATH = "/Users/leensalman/Desktop/gp2/rag/data/processed/chunks.json"
+OUTPUT_PATH = "/Users/leensalman/Desktop/gp2/CogniCare/rag/data/processed/documents/chunks.json"
 
 def is_good_chunk(content):
     text = content.lower()
@@ -28,10 +28,7 @@ def is_good_chunk(content):
     if text.startswith("."):
         return False
 
-    if text.count(".") > 20:
-        return False
-
-    if len(text.split()) < 50:
+    if len(text.split()) < 40:
         return False
 
     return True
