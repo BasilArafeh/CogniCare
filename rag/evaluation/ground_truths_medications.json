@@ -1,0 +1,122 @@
+[
+    {
+      "question": "What is acetaminophen used for?",
+      "ground_truth": "Acetaminophen temporarily relieves minor aches and pains due to headache, the common cold, backache, minor pain of arthritis, toothache, muscular aches, and premenstrual and menstrual cramps. It also temporarily reduces fever. Adults and children 12 years and over should take 2 gelcaps every 6 hours while symptoms last and should not exceed 6 gelcaps in 24 hours unless directed by a doctor.",
+      "retrieval_target": "medications",
+      "medication_search_term": "acetaminophen"
+    },
+    {
+      "question": "Can I take Panadol for my headache?",
+      "ground_truth": "Yes, Panadol is a brand name for acetaminophen and it temporarily relieves minor aches and pains including headaches. Adults and children 12 years and over should take 2 gelcaps every 6 hours while symptoms last and should not take more than 6 gelcaps in 24 hours unless directed by a doctor. Do not take for more than 10 days unless directed by a doctor.",
+      "retrieval_target": "medications",
+      "medication_search_term": "acetaminophen"
+    },
+    {
+      "question": "How should I take alendronate and does it matter if I eat first?",
+      "ground_truth": "Alendronate must be taken upon arising for the day at least 30 minutes before the first food, beverage, or medication of the day. It should be dissolved in approximately half a glass of plain room temperature water only. After taking alendronate patients must avoid lying down for at least 30 minutes and until after the first food of the day. Food and other beverages significantly reduce its absorption.",
+      "retrieval_target": "medications",
+      "medication_search_term": "alendronate"
+    },
+    {
+      "question": "Can I take alendronate with coffee or juice instead of water?",
+      "ground_truth": "No. Alendronate must be dissolved in plain room temperature water only and not mineral water or flavored water. Calcium supplements, antacids, or oral medications containing multivalent cations interfere with absorption of alendronate. Patients should wait at least one half hour after taking alendronate before taking any other oral medications. Other beverages significantly reduce its absorption.",
+      "retrieval_target": "medications",
+      "medication_search_term": "alendronate"
+    },
+    {
+      "question": "What should I do if I miss my weekly alendronate dose?",
+      "ground_truth": "If the once-weekly alendronate dose is missed, patients should take one dose on the morning after they remember. They should not take 2 doses on the same day but should return to taking one dose once a week as originally scheduled on their chosen day. Never double up doses to make up for a missed one.",
+      "retrieval_target": "medications",
+      "medication_search_term": "alendronate"
+    },
+    {
+      "question": "I took my blood pressure medicine twice today by accident, is that dangerous?",
+      "ground_truth": "Amlodipine overdosage might be expected to cause excessive peripheral vasodilation with marked hypotension and possibly a reflex tachycardia. If massive overdose should occur active cardiac and respiratory monitoring should be initiated. Frequent blood pressure measurements are essential. Should hypotension occur cardiovascular support including elevation of the extremities and administration of fluids may be required. Contact your doctor or a Poison Control Center immediately.",
+      "retrieval_target": "medications",
+      "medication_search_term": "amlodipine"
+    },
+    {
+      "question": "My doctor gave me alendronate, what is it for and how do I take it?",
+      "ground_truth": "Alendronate is a bisphosphonate indicated for treatment of osteoporosis in postmenopausal women and treatment to increase bone mass in men with osteoporosis. It increases bone mass and reduces the incidence of fractures including those of the hip and spine. Take it first thing in the morning with plain water only at least 30 minutes before eating, drinking anything else, or taking other medications. Remain upright for at least 30 minutes after taking it to prevent esophageal irritation.",
+      "retrieval_target": "medications",
+      "medication_search_term": "alendronate"
+    },
+    {
+      "question": "What are the risks of taking alprazolam with other CNS depressants?",
+      "ground_truth": "Alprazolam is a benzodiazepine indicated for acute treatment of generalized anxiety disorder and treatment of panic disorder. The benzodiazepines including alprazolam produce additive CNS depressant effects when coadministered with other CNS depressants such as psychotropic medications, anticonvulsants, antihistaminics, and ethanol. The concomitant use of benzodiazepines and opioids increases the risk of respiratory depression. Overdosage of benzodiazepines in combination with other CNS depressants including alcohol and opioids may be fatal.",
+      "retrieval_target": "medications",
+      "medication_search_term": "alprazolam"
+    },
+    {
+      "question": "I have been taking alprazolam for a week, why do I feel more anxious when I miss a dose?",
+      "ground_truth": "Alprazolam is a benzodiazepine used for anxiety and panic disorder. To reduce the risk of withdrawal reactions a gradual taper should be used to discontinue alprazolam or reduce the dosage. Discontinuation-emergent symptoms reported in alprazolam-treated patients include anxiety at 19.2 percent and insomnia at 29.5 percent. If a patient develops withdrawal reactions consider pausing the taper or increasing the dosage to the previous tapered dosage level. Never stop or reduce doses without consulting your doctor.",
+      "retrieval_target": "medications",
+      "medication_search_term": "alprazolam"
+    },
+    {
+      "question": "My doctor prescribed amitriptyline but I already take heart medication, is that safe?",
+      "ground_truth": "Amitriptyline is a tricyclic antidepressant indicated for relief of symptoms of depression. Patients with cardiovascular disorders should be watched closely. Tricyclic antidepressant drugs including amitriptyline particularly when given in high doses have been reported to produce arrhythmias, sinus tachycardia, and prolongation of conduction time. Amiodarone has a documented interaction with tricyclic antidepressants increasing the risk of Torsade de Pointes. Always inform your doctor of all medications you are taking before starting any new medication.",
+      "retrieval_target": "medications",
+      "medication_search_term": "amitriptyline"
+    },
+    {
+      "question": "I feel dizzy every time I take amlodipine, is this normal?",
+      "ground_truth": "Dizziness is a known dose-related side effect of amlodipine. The incidence of dizziness in clinical trials was 1.1 percent at 2.5 mg, 3.4 percent at 5 mg, and 3.4 percent at 10 mg compared to 1.5 percent for placebo. Most adverse reactions reported during therapy with amlodipine were of mild or moderate severity. If dizziness is severe or persistent contact your doctor as your dose may need adjustment.",
+      "retrieval_target": "medications",
+      "medication_search_term": "amlodipine"
+    },
+    {
+      "question": "Can I take acetaminophen and ibuprofen together for stronger pain relief?",
+      "ground_truth": "Acetaminophen carries a serious liver warning. Severe liver damage may occur if you take more than 4000 mg of acetaminophen in 24 hours or with other drugs containing acetaminophen or 3 or more alcoholic drinks every day while using this product. Do not use with any other drug containing acetaminophen. Always consult your doctor before combining pain medications to ensure it is safe for your specific situation.",
+      "retrieval_target": "medications",
+      "medication_search_term": "acetaminophen"
+    },
+    {
+      "question": "Why does my doctor want me to take alendronate first thing in the morning with water only?",
+      "ground_truth": "Alendronate must be taken upon arising for the day at least 30 minutes before the first food, beverage, or medication of the day. It must be dissolved in plain room temperature water only and not mineral water or flavored water. Patients must avoid lying down for at least 30 minutes after taking it and until after the first food of the day. Failure to follow these instructions may increase the risk of esophageal adverse reactions. Food and other beverages significantly reduce absorption.",
+      "retrieval_target": "medications",
+      "medication_search_term": "alendronate"
+    },
+    {
+      "question": "I have liver disease and my doctor prescribed acetaminophen, should I be worried?",
+      "ground_truth": "Yes you should be cautious. Acetaminophen carries a serious liver warning. Severe liver damage may occur if you take more than 4000 mg of acetaminophen in 24 hours or with other drugs containing acetaminophen or 3 or more alcoholic drinks every day while using this product. The label specifically states to ask a doctor before use if you have liver disease. Do not take it without your doctor's explicit guidance and never exceed the recommended dose.",
+      "retrieval_target": "medications",
+      "medication_search_term": "acetaminophen"
+    },
+    {
+      "question": "I take amiodarone for my heart and my doctor added alprazolam, what should I watch out for?",
+      "ground_truth": "Amiodarone has serious drug interactions with QT prolonging drugs including tricyclic antidepressants increasing the risk of Torsade de Pointes. Alprazolam produces additive CNS depressant effects when combined with other medications. Because of amiodarone's long half-life drug interactions can persist for weeks to months after discontinuation. Watch for irregular heartbeat, excessive sedation, dizziness, or unusual fatigue and report them to your doctor immediately.",
+      "retrieval_target": "medications",
+      "medication_search_term": "amiodarone"
+    },
+    {
+      "question": "My doctor stopped my alendronate after 5 years, why would they do that?",
+      "ground_truth": "The optimal duration of use of alendronate has not been determined. All patients on bisphosphonate therapy should have the need for continued therapy re-evaluated on a periodic basis. Patients at low risk for fracture should be considered for drug discontinuation after 3 to 5 years of use. Patients who discontinue therapy should have their risk for fracture re-evaluated periodically.",
+      "retrieval_target": "medications",
+      "medication_search_term": "alendronate"
+    },
+    {
+      "question": "I take warfarin and my doctor just added acetaminophen, what does this mean for my blood levels?",
+      "ground_truth": "Acetaminophen's warnings specifically state to ask a doctor or pharmacist before use if you are taking the blood thinning drug warfarin. Amiodarone potentiates the anticoagulant response of warfarin and can result in serious or fatal bleeding. Coadministration increases prothrombin time by 100 percent after 3 to 4 days requiring a warfarin dose reduction of one-third to one-half. Your doctor will need to monitor your blood clotting levels closely.",
+      "retrieval_target": "medications",
+      "medication_search_term": "acetaminophen"
+    },
+    {
+      "question": "Why does amitriptyline make me feel drowsy in the morning even though I take it at night?",
+      "ground_truth": "Amitriptyline has sedating properties. A sedative effect may be apparent before the antidepressant effect is noted and an adequate therapeutic effect may take as long as 30 days to develop. Drowsiness is listed as a known CNS and neuromuscular adverse reaction of amitriptyline. The initial dosage is often started at bedtime and increased gradually. Never adjust the dose on your own without consulting your doctor first.",
+      "retrieval_target": "medications",
+      "medication_search_term": "amitriptyline"
+    },
+    {
+      "question": "I have been on amlodipine for months but my blood pressure is still high, could my other medications be interfering?",
+      "ground_truth": "Yes certain medications can interfere with amlodipine. Co-administration with CYP3A inhibitors moderate and strong results in increased systemic exposure to amlodipine and may require dose reduction. CYP3A inducers may reduce amlodipine levels and blood pressure should be closely monitored. Amlodipine also increases the systemic exposure of simvastatin, cyclosporine, and tacrolimus. Tell your doctor all medications you are taking so they can assess whether an interaction is affecting your blood pressure control.",
+      "retrieval_target": "medications",
+      "medication_search_term": "amlodipine"
+    },
+    {
+      "question": "My doctor prescribed amiodarone and told me to avoid certain foods and medications, what should I avoid?",
+      "ground_truth": "Amiodarone has several critical interactions. Avoid grapefruit juice and certain fluoroquinolone and macrolide antibiotics and azole antifungals as they increase exposure of amiodarone. Avoid other QT prolonging drugs including class I and III antiarrhythmics, lithium, certain phenothiazines, tricyclic antidepressants, and certain antibiotics as combining them increases the risk of Torsade de Pointes. St. John's Wort reduces amiodarone serum levels. Warfarin dose must be reduced by one-third to one-half and digoxin must be reduced by half. Because of amiodarone's long half-life these interactions can persist for weeks to months after discontinuation.",
+      "retrieval_target": "medications",
+      "medication_search_term": "amiodarone"
+    }
+  ]

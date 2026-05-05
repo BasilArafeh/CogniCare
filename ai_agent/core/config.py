@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Shared `.env` lives at CogniCare repository root (parent of `ai_agent/`).
+_COGNICARE_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(_COGNICARE_ROOT / ".env")
 
 
 # Reads one environment variable as a stripped string or None when unset/blank.

@@ -71,8 +71,7 @@ def _naturalize(question: str, sql_result_json: str, patient_first_name: str) ->
         logger.exception("DB format LLM call failed")
 
     return (
-        f"I couldn't find that information right now, {patient_first_name}. "
-        "Let me ask your caregiver to help you with this."
+        f"I couldn't find that information in your records, {patient_first_name}. "
     )
 
 
