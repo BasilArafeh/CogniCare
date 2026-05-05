@@ -24,6 +24,15 @@ class ChatMessageRequest(BaseModel):
     language: str = Field(default="en")
 
 
+class ReminderReplyRequest(BaseModel):
+    """Patient tap or reply after a scheduled reminder."""
+
+    patient_id: str = Field(min_length=1)
+    reminder_type: str = Field(min_length=1)
+    item_label: str = Field(min_length=1)
+    confirmed: bool
+
+
 class AgentResponse(BaseModel):
     """Final reply to the caller."""
 
@@ -35,5 +44,6 @@ __all__ = [
     "AgentResponse",
     "ChatMessageRequest",
     "IntentRoute",
+    "ReminderReplyRequest",
     "VoiceMessageRequest",
 ]

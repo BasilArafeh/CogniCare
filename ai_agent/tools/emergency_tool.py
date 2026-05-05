@@ -28,7 +28,6 @@ class EscalationOutcome:
 async def escalate_to_caregiver(
     *,
     patient_id: str,
-    session_id: str,
     patient_first_name: str,
     user_message: str,
 ) -> EscalationOutcome:
@@ -42,7 +41,6 @@ async def escalate_to_caregiver(
     caregiver_body = (
         "COGNICARE EMERGENCY\n"
         f"Patient ID: {patient_id}\n"
-        f"Session: {session_id}\n"
         f"Patient said: {user_message.strip()[:500]}\n"
         "Please contact them immediately."
     )

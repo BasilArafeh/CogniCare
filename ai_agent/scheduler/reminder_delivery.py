@@ -1,23 +1,39 @@
 """
-Reminder pipeline: insert ``reminders`` row, log outbound text like a normal turn, then wait for reply.
+Reminder pipeline (Teammate 2 owns push UI; we own scheduling + persistence).
 
-On timeout: mark ``missed``, log interaction, SMS caregiver that they likely missed the item.
-On patient message (orchestrator): mark ``responded`` (interaction turn is saved separately by orchestrator).
+Boot (see ``scheduler.scheduler``): APScheduler loads all patients' med/meal/activity
+times from Supabase, registers cron jobs, and reloads schedules every hour.
 
-If a new reminder fires before the prior window closes, the prior row is marked ``superseded``.
+When a cron fires:
+  - Insert a ``reminders`` row (status ``sent``), log outbound copy to ``interaction_log``,
+    POST JSON ``{patient_id, message}`` to ``PATIENT_REMINDER_WEBHOOK_URL``, then start a
+    5-minute ``threading.Timer``.
+
+If the patient replies in time:
+  - Teammate 2 calls ``POST /agent/reminder-reply`` (structured reply, no LLM) or any
+    normal chat invokes ``acknowledge_patient_message``: timer cancelled,
+    reminder row ``responded``.
+
+If the timer fires:
+  - Reminder marked ``missed``, missed turn logged to ``interaction_log``.
+  - Optional POST to ``MISSED_REMINDER_ESCALATION_WEBHOOK_URL`` (e.g. service that SMSes
+    via Twilio). We do not send SMS from this module.
+
+Supersede: if a new reminder queues for the same patient before the window closes,
+the prior row becomes ``superseded`` without caregiver escalation.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from typing import Literal
 
-from integrations.twilio_sms import deliver_sms
 from memory.memory_manager import save_interaction
 from scheduler.queries.reminders_write import insert_reminder_instance, update_reminder_status
 
@@ -26,6 +42,15 @@ logger = logging.getLogger(__name__)
 RESPONSE_WINDOW_SEC = 300
 
 ReminderKind = Literal["medication", "meal", "activity"]
+
+
+@dataclass(frozen=True)
+class AcknowledgedReminder:
+    """Populated when a pending reminder window was cleared (explicit reply or any chat/voice turn)."""
+
+    reminder_id: str | None
+    reminder_type: ReminderKind
+    item_label: str
 
 
 @dataclass
@@ -39,14 +64,14 @@ class _PendingFollowup:
 _pending_by_patient: dict[str, _PendingFollowup] = {}
 
 
-# Cancels outbound window and marks the reminder row as responded when the patient sends any chat message.
-def acknowledge_patient_message(patient_id: str) -> None:
+# Cancels outbound window and marks the reminder row as responded.
+def acknowledge_patient_message(patient_id: str) -> AcknowledgedReminder | None:
     pid = patient_id.strip()
     if not pid:
-        return
+        return None
     pending = _pending_by_patient.pop(pid, None)
     if pending is None:
-        return
+        return None
     pending.timer.cancel()
     update_reminder_status(pending.reminder_id, "responded")
     logger.info(
@@ -54,11 +79,14 @@ def acknowledge_patient_message(patient_id: str) -> None:
         pid,
         pending.reminder_id,
     )
+    return AcknowledgedReminder(
+        reminder_id=pending.reminder_id,
+        reminder_type=pending.reminder_type,
+        item_label=pending.item_label,
+    )
 
 
 def _patient_webhook_post(patient_id: str, body: str) -> None:
-    import os
-
     url = (os.getenv("PATIENT_REMINDER_WEBHOOK_URL") or "").strip()
     if not url:
         return
@@ -93,41 +121,66 @@ def _supersede_active_reminder(pid: str) -> None:
     )
 
 
-def _notify_caregiver_missed(
+def _post_missed_reminder_escalation(
     *,
     patient_id: str,
     reminder_kind: ReminderKind,
     item_label: str,
     reminder_id: str | None,
     detail_suffix: str,
-) -> None:
-    import os
-
-    phone = (os.getenv("CAREGIVER_ALERT_SMS") or "").strip()
-    if not phone:
-        logger.warning(
-            "[reminder_delivery] CAREGIVER_ALERT_SMS unset; caregiver SMS skipped patient_id=%s",
+) -> bool:
+    """
+    Notify an external service (e.g. Teammate 2) so they can SMS the caregiver via Twilio.
+    Returns True if an HTTP POST was attempted and returned 2xx.
+    """
+    url = (os.getenv("MISSED_REMINDER_ESCALATION_WEBHOOK_URL") or "").strip()
+    if not url:
+        logger.info(
+            "[reminder_delivery] MISSED_REMINDER_ESCALATION_WEBHOOK_URL unset; "
+            "no missed-reminder escalation POST patient_id=%s",
             patient_id,
         )
-        return
+        return False
 
     readable = {"medication": "medication", "meal": "meal", "activity": "activity"}[reminder_kind]
-    body = (
-        "CogniCare — reminder follow-up\n"
-        f"The patient likely missed their scheduled {readable}: {item_label}.\n"
-        f"No reply within {RESPONSE_WINDOW_SEC // 60} minutes after we sent the reminder.\n"
-        f"Patient ID: {patient_id}\n"
+    summary = (
+        f"No reply within {RESPONSE_WINDOW_SEC // 60} minutes after outbound {readable} "
+        f"reminder for '{item_label}'."
     )
-    if reminder_id:
-        body += f"Reminder ID: {reminder_id}\n"
-    if detail_suffix.strip():
-        body += f"{detail_suffix.strip()[:300]}"
-
-    ok = deliver_sms(to_phone=phone, body=body.strip())
-    if ok:
-        logger.info("[reminder_delivery] Caregiver SMS sent (likely missed) patient_id=%s", patient_id)
-    else:
-        logger.error("[reminder_delivery] Caregiver SMS failed patient_id=%s", patient_id)
+    payload_obj = {
+        "event": "reminder_missed_no_reply",
+        "patient_id": patient_id,
+        "reminder_type": reminder_kind,
+        "item_label": item_label,
+        "reminder_id": reminder_id,
+        "summary": summary.strip(),
+        "detail": detail_suffix.strip()[:500],
+    }
+    payload = json.dumps(payload_obj).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            ok = 200 <= resp.status < 300
+            if ok:
+                logger.info("[reminder_delivery] Missed-reminder escalation POST ok patient_id=%s", patient_id)
+            else:
+                logger.error(
+                    "[reminder_delivery] Escalation webhook HTTP %s patient_id=%s",
+                    resp.status,
+                    patient_id,
+                )
+            return ok
+    except urllib.error.HTTPError as e:
+        logger.error("[reminder_delivery] Escalation webhook failed patient_id=%s code=%s", patient_id, e.code)
+        return False
+    except Exception:
+        logger.exception("[reminder_delivery] Escalation webhook error patient_id=%s", patient_id)
+        return False
 
 
 def _log_missed_interaction(
@@ -136,15 +189,21 @@ def _log_missed_interaction(
     reminder_kind: ReminderKind,
     item_label: str,
     reminder_id: str | None,
+    escalation_sent: bool,
 ) -> None:
     label = {"medication": "Medication", "meal": "Meal", "activity": "Activity"}[reminder_kind]
     tail = f" Reminder record: {reminder_id}." if reminder_id else ""
+    follow = (
+        " Escalation webhook delivered."
+        if escalation_sent
+        else " Escalation webhook not configured or failed."
+    )
     save_interaction(
         patient_id=patient_id,
         user_text="[No patient reply within reminder follow-up window]",
         assistant_text=(
-            f"System ({label.lower()} reminder): no timely response recorded as missed "
-            f"for '{item_label}'. Caregiver was notified.{tail}"
+            f"System ({label.lower()} reminder): no timely response; recorded as missed "
+            f"for '{item_label}'.{follow}{tail}"
         ),
         detected_intent="REMINDER_MISSED",
         confusion_flag=False,
@@ -168,18 +227,19 @@ def _schedule_followup(
             return
         _pending_by_patient.pop(pid, None)
         update_reminder_status(reminder_id, "missed")
-        _log_missed_interaction(
-            patient_id=pid,
-            reminder_kind=reminder_kind,
-            item_label=item_label,
-            reminder_id=reminder_id,
-        )
-        _notify_caregiver_missed(
+        posted = _post_missed_reminder_escalation(
             patient_id=pid,
             reminder_kind=reminder_kind,
             item_label=item_label,
             reminder_id=reminder_id,
             detail_suffix=detail_suffix,
+        )
+        _log_missed_interaction(
+            patient_id=pid,
+            reminder_kind=reminder_kind,
+            item_label=item_label,
+            reminder_id=reminder_id,
+            escalation_sent=posted,
         )
 
     t = threading.Timer(RESPONSE_WINDOW_SEC, _fire)
@@ -256,6 +316,7 @@ def deliver_reminder_to_patient(
 
 
 __all__ = [
+    "AcknowledgedReminder",
     "RESPONSE_WINDOW_SEC",
     "ReminderKind",
     "acknowledge_patient_message",

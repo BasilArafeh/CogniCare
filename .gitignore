@@ -1,9 +1,7 @@
-# --- Secrets & local overrides (shared CogniCare root) ---
 .env
 .env.*
 !.env.example
 
-# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -17,17 +15,11 @@ build/
 .venv/
 venv/
 .envrc
-
-# --- Test / tooling caches ---
 .pytest_cache/
 .coverage*
 .mypy_cache/
 .ruff_cache/
-
-# --- CogniCare app artifacts ---
 **/chroma_store/
-
-# --- OS / IDE ---
 .DS_Store
 Thumbs.db
 .idea/

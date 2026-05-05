@@ -2,7 +2,7 @@
 Top-level orchestration for one patient turn.
 
 Flow:
-1) Input from frontend: patient_id, session_id, message
+1) Input from frontend: patient_id, message, language
 2) Load memory: recent turns + profile/notes
 3) Route intent
 4) EMERGENCY bypass -> tools.emergency_tool.escalate_to_caregiver (no agent)
@@ -16,8 +16,14 @@ from __future__ import annotations
 import logging
 from typing import Any, Awaitable, Callable
 
+from langchain_core.messages import SystemMessage
+from langchain_openai import ChatOpenAI
+
+from core.config import config
+from core.language_tags import normalize_primary_language
 from memory.memory_manager import get_recent_turns, load_full_memory, save_interaction
 from orchestration.agent_executor import run_agent as default_run_agent
+from prompts.llm_prompt import LLM_PROMPT
 from routers.intent_router import route_intent
 from schemas.agent_schemas import AgentResponse
 from scheduler.reminder_delivery import acknowledge_patient_message
@@ -52,6 +58,40 @@ def _history_rows_to_text(history_rows: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+# LLM-only route: single completion with LLM_PROMPT (no tools / no ReAct).
+async def _run_llm_fallback(
+    *,
+    message: str,
+    patient_name: str,
+    diagnosis_stage: str,
+    conversation_history: str,
+    language: str,
+) -> str:
+    lang = normalize_primary_language(language)
+    safe_fallback = (
+        (
+            f"أنا هنا معك يا {patient_name}. أواجه مشكلة صغيرة الآن، لكن يمكنني المحاولة مرة أخرى."
+        )
+        if lang == "ar"
+        else f"I'm here with you, {patient_name}. I'm having a little trouble right now, but I can try again."
+    )
+    try:
+        system_content = LLM_PROMPT.format(
+            patient_name=patient_name,
+            diagnosis_stage=diagnosis_stage,
+            conversation_history=conversation_history,
+            message=message,
+            language=lang,
+        )
+        llm = ChatOpenAI(model=config.agent_llm_model, temperature=0.4)
+        rsp = await llm.ainvoke([SystemMessage(content=system_content)])
+        text = str(getattr(rsp, "content", "") or "").strip()
+        return text or safe_fallback
+    except Exception:
+        logger.exception("_run_llm_fallback failed")
+        return safe_fallback
+
+
 # Builds the route-appropriate tool list (DB, RAG, DB_RAG, or empty).
 def _build_tools_for_route(route: str, patient_id: str, patient_name: str) -> list[Any]:
     db_tools = create_database_tools(patient_id=patient_id, patient_first_name=patient_name)
@@ -69,12 +109,14 @@ def _build_tools_for_route(route: str, patient_id: str, patient_name: str) -> li
 # Main orchestration entry: memory, routing, emergency tool, agent, persistence.
 async def orchestrate_message(
     patient_id: str,
-    session_id: str,
     message: str,
+    language: str = "en",
     *,
     run_agent: AgentRunner | None = None,
 ) -> AgentResponse:
-    logger.info("Orchestration started patient_id=%s session_id=%s", patient_id, session_id)
+    logger.info("Orchestration started patient_id=%s", patient_id)
+
+    effective_lang = normalize_primary_language(language)
 
     acknowledge_patient_message(patient_id)
 
@@ -97,7 +139,6 @@ async def orchestrate_message(
     if route == "EMERGENCY":
         outcome = await escalate_to_caregiver(
             patient_id=patient_id,
-            session_id=session_id,
             patient_first_name=patient_name,
             user_message=message,
         )
@@ -110,26 +151,32 @@ async def orchestrate_message(
         )
         return AgentResponse(
             response=outcome.patient_reply,
-            intent="EMERGENCY",
-            session_id=session_id,
             patient_id=patient_id,
-            emergency_escalated=outcome.escalated,
-            confusion_flag=False,
         )
 
-    tools = _build_tools_for_route(route, patient_id, patient_name)
-    runner = run_agent or default_run_agent
+    if route == "LLM":
+        assistant_text = await _run_llm_fallback(
+            message=message,
+            patient_name=patient_name,
+            diagnosis_stage=diagnosis_stage,
+            conversation_history=conversation_history,
+            language=effective_lang,
+        )
+    else:
+        tools = _build_tools_for_route(route, patient_id, patient_name)
+        runner = run_agent or default_run_agent
 
-    assistant_text = await runner(
-        message=message,
-        intent=route,
-        sql=sql_query,
-        tools=tools,
-        patient_name=patient_name,
-        diagnosis_stage=diagnosis_stage,
-        patient_profile=profile,
-        conversation_history=conversation_history,
-    )
+        assistant_text = await runner(
+            message=message,
+            intent=route,
+            sql=sql_query,
+            tools=tools,
+            patient_name=patient_name,
+            diagnosis_stage=diagnosis_stage,
+            patient_profile=profile,
+            conversation_history=conversation_history,
+            language=effective_lang,
+        )
 
     confusion_flag = route == "CLARIFY"
     save_interaction(
@@ -142,9 +189,5 @@ async def orchestrate_message(
 
     return AgentResponse(
         response=assistant_text,
-        intent=route,  # type: ignore[arg-type]
-        session_id=session_id,
         patient_id=patient_id,
-        emergency_escalated=False,
-        confusion_flag=confusion_flag,
     )

@@ -1,7 +1,11 @@
 """
-APScheduler bootstrap: loads DB-backed times once and hourly, registers meds/meals/activities.
+APScheduler bootstrap for CogniCare reminders.
 
-Run next to FastAPI/Uvicorn: ``start_scheduler()`` from app lifespan.
+On FastAPI startup (lifespan), ``start_scheduler()`` starts a background scheduler that
+reads every patient's medication, meal, and activity times from Supabase, registers cron
+jobs for those clock times, and reloads the full schedule from the database every hour.
+Jobs run silently until a slot fires; see ``scheduler.reminder_delivery`` for outbound
+logging, Teammate 2 webhook delivery, and the 5-minute reply window.
 """
 
 from __future__ import annotations

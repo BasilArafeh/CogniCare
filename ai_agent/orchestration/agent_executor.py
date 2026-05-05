@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from core.config import config
+from core.language_tags import normalize_primary_language
 from prompts.agent_prompt import AGENT_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ def _build_agent_system_prompt(
     diagnosis_stage: str,
     patient_profile: Any,
     conversation_history: str,
+    language: str,
 ) -> str:
     profile_text = (
         patient_profile
@@ -34,6 +36,7 @@ def _build_agent_system_prompt(
         patient_profile=profile_text,
         conversation_history=conversation_history,
         intent=intent,
+        language=normalize_primary_language(language),
     )
 
 
@@ -55,10 +58,15 @@ async def run_agent(
     diagnosis_stage: str,
     patient_profile: Any,
     conversation_history: str,
+    language: str = "en",
 ) -> str:
+    lang = normalize_primary_language(language)
     safe_fallback = (
-        f"I'm here with you, {patient_name}. I'm having a little trouble right now, "
-        "but I can try again."
+        (
+            f"أنا هنا معك يا {patient_name}. أواجه مشكلة صغيرة الآن، لكن يمكنني المحاولة مرة أخرى."
+            if lang == "ar"
+            else f"I'm here with you, {patient_name}. I'm having a little trouble right now, but I can try again."
+        )
     )
     try:
         from langchain.agents import AgentExecutor, create_react_agent
@@ -80,6 +88,7 @@ async def run_agent(
             diagnosis_stage=diagnosis_stage,
             patient_profile=patient_profile,
             conversation_history=conversation_history,
+            language=lang,
         )
         user_input = _build_agent_input_message(message=message, intent=intent, sql=sql)
 
