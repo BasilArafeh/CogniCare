@@ -43,3 +43,6 @@ Rules:
 OUTPUT:
 Return only the answer text — no preamble or metadata.
 """
+
+# Alias for imports that expect ``RAG_PROMPT``.
+RAG_PROMPT = RAG_FORMAT_PROMPT

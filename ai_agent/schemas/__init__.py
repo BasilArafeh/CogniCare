@@ -1,3 +1,15 @@
-from .agent_schemas import AgentResponse, IntentRoute, MessageRequest
+from .agent_schemas import (
+    AgentResponse,
+    ChatMessageRequest,
+    IntentRoute,
+    ReminderReplyRequest,
+    VoiceMessageRequest,
+)
 
-__all__ = ["AgentResponse", "IntentRoute", "MessageRequest"]
+__all__ = [
+    "AgentResponse",
+    "ChatMessageRequest",
+    "IntentRoute",
+    "ReminderReplyRequest",
+    "VoiceMessageRequest",
+]
