@@ -139,7 +139,7 @@ For every patient-specific query include a predicate like:
     WHERE patient_id = '<paste the PATIENT ID value shown at the bottom, in single quotes>'
 
 Use single SELECT statements only. Do not reference interaction_log,
-short_term_memory, or long_term_memory.
+ or long_term_memory.
 
 --------------------------------------------------
 patients
