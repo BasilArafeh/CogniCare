@@ -1,6 +1,4 @@
-"""
-Request and response shapes for the agent API (e.g. POST /agent/message).
-"""
+"""Simple request/response schemas for the agent."""
 
 from typing import Literal
 
@@ -10,23 +8,32 @@ from pydantic import BaseModel, Field
 IntentRoute = Literal["DB", "RAG", "DB_RAG", "LLM", "CLARIFY", "EMERGENCY"]
 
 
-class MessageRequest(BaseModel):
-    """One message from the client."""
+class VoiceMessageRequest(BaseModel):
+    """Voice request after STT."""
 
     patient_id: str = Field(min_length=1)
-    session_id: str = Field(min_length=1)
     message: str = Field(min_length=1, max_length=1000)
+    language: str = Field(default="en")
+
+
+class ChatMessageRequest(BaseModel):
+    """Chat request from the app."""
+
+    patient_id: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=1000)
+    language: str = Field(default="en")
 
 
 class AgentResponse(BaseModel):
-    """One reply back to the client after a turn."""
+    """Final reply to the caller."""
 
-    response: str
-    intent: IntentRoute
-    session_id: str
-    patient_id: str
-    emergency_escalated: bool = False
-    confusion_flag: bool = False
+    response: str = Field(min_length=1)
+    patient_id: str = Field(min_length=1)
 
 
-__all__ = ["AgentResponse", "IntentRoute", "MessageRequest"]
+__all__ = [
+    "AgentResponse",
+    "ChatMessageRequest",
+    "IntentRoute",
+    "VoiceMessageRequest",
+]

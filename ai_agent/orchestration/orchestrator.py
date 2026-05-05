@@ -16,12 +16,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Awaitable, Callable
 
-from core.config import config
-from core.connections import async_openai_client
 from memory.memory_manager import get_recent_turns, load_full_memory, save_interaction
-from prompts.llm_prompt import LLM_PROMPT
+from orchestration.agent_executor import run_agent as default_run_agent
 from routers.intent_router import route_intent
 from schemas.agent_schemas import AgentResponse
+from scheduler.reminder_delivery import acknowledge_patient_message
 from tools.db_tools import create_database_tools
 from tools.emergency_tool import escalate_to_caregiver
 from tools.rag_tool import create_rag_tools
@@ -67,30 +66,6 @@ def _build_tools_for_route(route: str, patient_id: str, patient_name: str) -> li
     return []
 
 
-# Runs one light LLM response path for LLM/CLARIFY or fallback without agent wiring.
-async def _run_llm_fallback(
-    message: str,
-    patient_name: str,
-    diagnosis_stage: str,
-    conversation_history: str,
-) -> str:
-    prompt = LLM_PROMPT.format(
-        patient_name=patient_name,
-        diagnosis_stage=diagnosis_stage,
-        conversation_history=conversation_history,
-        message=message,
-    )
-    response = await async_openai_client.chat.completions.create(
-        model=config.agent_llm_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.5,
-        max_tokens=350,
-    )
-    return (response.choices[0].message.content or "").strip() or (
-        f"I hear you, {patient_name}. I'm here with you."
-    )
-
-
 # Main orchestration entry: memory, routing, emergency tool, agent, persistence.
 async def orchestrate_message(
     patient_id: str,
@@ -100,6 +75,8 @@ async def orchestrate_message(
     run_agent: AgentRunner | None = None,
 ) -> AgentResponse:
     logger.info("Orchestration started patient_id=%s session_id=%s", patient_id, session_id)
+
+    acknowledge_patient_message(patient_id)
 
     recent_turns = get_recent_turns(patient_id=patient_id, n=3)
     full_memory = load_full_memory(patient_id=patient_id)
@@ -141,32 +118,18 @@ async def orchestrate_message(
         )
 
     tools = _build_tools_for_route(route, patient_id, patient_name)
+    runner = run_agent or default_run_agent
 
-    if run_agent is not None:
-        assistant_text = await run_agent(
-            message=message,
-            intent=route,
-            sql=sql_query,
-            tools=tools,
-            patient_name=patient_name,
-            diagnosis_stage=diagnosis_stage,
-            patient_profile=profile,
-            conversation_history=conversation_history,
-        )
-    else:
-        if route in {"LLM", "CLARIFY"}:
-            assistant_text = await _run_llm_fallback(
-                message=message,
-                patient_name=patient_name,
-                diagnosis_stage=diagnosis_stage,
-                conversation_history=conversation_history,
-            )
-        else:
-            assistant_text = (
-                f"I'll check that for you now, {patient_name}. "
-                "If needed, your caregiver can help with details."
-            )
-        logger.info("run_agent not provided; used fallback response for route=%s", route)
+    assistant_text = await runner(
+        message=message,
+        intent=route,
+        sql=sql_query,
+        tools=tools,
+        patient_name=patient_name,
+        diagnosis_stage=diagnosis_stage,
+        patient_profile=profile,
+        conversation_history=conversation_history,
+    )
 
     confusion_flag = route == "CLARIFY"
     save_interaction(
