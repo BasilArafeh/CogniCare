@@ -19,6 +19,13 @@ from schemas.agent_schemas import AgentResponse, ChatMessageRequest, VoiceMessag
 logger = logging.getLogger(__name__)
 
 
+def _normalize_patient_id(raw: str | int) -> str:
+    pid = str(raw).strip()
+    if not pid:
+        raise ValueError("patient_id must not be empty")
+    return pid
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
@@ -46,21 +53,30 @@ app.include_router(agent_router)
 @app.post("/voice", response_model=AgentResponse, include_in_schema=False)
 async def legacy_voice(req: VoiceMessageRequest) -> AgentResponse:
     return await orchestrate_message(
-        patient_id=req.patient_id,
+        patient_id=_normalize_patient_id(req.patient_id),
         message=req.message,
         language=req.language,
         run_agent=run_agent,
     )
 
 
-@app.post("/chat", response_model=AgentResponse, include_in_schema=False)
-async def legacy_chat(req: ChatMessageRequest) -> AgentResponse:
-    return await orchestrate_message(
-        patient_id=req.patient_id,
+@app.post("/chat", include_in_schema=False)
+async def legacy_chat(req: ChatMessageRequest) -> dict[str, str]:
+    """
+    Backward-compatible frontend contract:
+    returns { "reply": "<text>" } while also exposing modern fields.
+    """
+    result = await orchestrate_message(
+        patient_id=_normalize_patient_id(req.patient_id),
         message=req.message,
         language=req.language,
         run_agent=run_agent,
     )
+    return {
+        "reply": result.response,
+        "response": result.response,
+        "patient_id": result.patient_id,
+    }
 
 
 @app.get("/health")
