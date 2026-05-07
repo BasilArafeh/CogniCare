@@ -69,7 +69,8 @@ async def run_agent(
         )
     )
     try:
-        from langchain.agents import AgentExecutor, create_react_agent
+        # LangChain 1.x: ReAct helpers live in langchain-classic, not langchain.agents.
+        from langchain_classic.agents import AgentExecutor, create_react_agent
         from langchain_core.messages import HumanMessage, SystemMessage
         from langchain_core.prompts import PromptTemplate
         from langchain_openai import ChatOpenAI
