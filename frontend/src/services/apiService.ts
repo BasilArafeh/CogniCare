@@ -6,7 +6,6 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 // Python backend URL — set EXPO_PUBLIC_RAG_URL in frontend/.env
-// On a physical device use your LAN IP, e.g. http://192.168.1.10:8000
 const RAG_BASE_URL = process.env.EXPO_PUBLIC_RAG_URL ?? 'http://localhost:8000';
 
 export class ApiException extends Error {
@@ -339,14 +338,24 @@ class ApiService {
   }
 
   async sendChatMessage(patientId: number, message: string, language = 'en'): Promise<string> {
-    console.log('[API] sendChatMessage: POST /agent/chat | patient_id =', patientId, '| language =', language, '| message =', message);
-    const { data } = await this.rag.post<{ response: string }>('/agent/chat', {
-      patient_id: String(patientId),
-      message,
-      language,
-    });
-    console.log('[API] sendChatMessage: reply =', data.response);
-    return data.response;
+    const url = `${RAG_BASE_URL}/agent/chat`;
+    console.log('[API] sendChatMessage: hitting', url, '| patient_id =', patientId, '| language =', language, '| message =', message);
+    try {
+      const { data } = await this.rag.post<{ response: string }>('/agent/chat', {
+        patient_id: String(patientId),
+        message,
+        language,
+      });
+      console.log('[API] sendChatMessage: reply =', data.response);
+      return data.response;
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        console.error('[API] sendChatMessage FAILED | url =', url, '| status =', err.response?.status ?? 'no response', '| code =', err.code, '| message =', err.message, '| body =', JSON.stringify(err.response?.data));
+      } else {
+        console.error('[API] sendChatMessage FAILED | unexpected error =', err);
+      }
+      throw err;
+    }
   }
 
   async sendVoiceRecording(
