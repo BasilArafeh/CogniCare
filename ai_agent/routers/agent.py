@@ -52,14 +52,12 @@ async def agent_voice(req: VoiceMessageRequest) -> AgentResponse:
 async def agent_chat(req: ChatMessageRequest) -> AgentResponse:
     logger.info("POST /agent/chat hit | patient_id=%s | language=%s | message=%s", req.patient_id, req.language, req.message)
     try:
-        result = await orchestrate_message(
-            patient_id=req.patient_id,
+        return await orchestrate_message(
+            patient_id=_normalize_patient_id(req.patient_id),
             message=req.message,
             language=req.language,
             run_agent=run_agent,
         )
-        logger.info("POST /agent/chat done | patient_id=%s | response=%s", req.patient_id, result.response)
-        return result
     except Exception:
         logger.exception("POST /agent/chat failed patient_id=%s", req.patient_id)
         raise HTTPException(status_code=500, detail="Internal server error.") from None
