@@ -1,7 +1,6 @@
 .env
 .env.*
 !.env.example
-
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,3 +22,20 @@ venv/
 .DS_Store
 Thumbs.db
 .idea/
+.vscode/
+
+# JavaScript / TypeScript (frontend/backend2)
+node_modules/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo / React Native local state
+.expo/
+.expo-shared/
+
+# Common JS build outputs
+.next/
+coverage/
