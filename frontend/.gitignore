@@ -1,0 +1,61 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.envrc
+.pytest_cache/
+.coverage*
+.mypy_cache/
+.ruff_cache/
+**/chroma_store/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# JavaScript / TypeScript (frontend/backend2)
+node_modules/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo / React Native local state
+.expo/
+.expo-shared/
+
+# Common JS build outputs
+.next/
+coverage/
+web-build/
+
+# Expo prebuild generated native dirs
+android/
+ios/
+
+# React Native merge conflict artifacts
+*.orig.*
+
+# Android signing
+*.jks
+
+# iOS signing
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Misc logs
+*.log
