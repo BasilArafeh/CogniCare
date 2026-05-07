@@ -10,6 +10,7 @@ import apiService, {
   type MedDisplay, type MealDisplay,
   type ActivityDisplay, type FamilyDisplay, type PatientRow,
 } from '../../services/apiService';
+import { getGreeting, formatTime, todayLabel } from '../../utils/time';
 
 interface Props {
   patientId: number;
@@ -17,24 +18,6 @@ interface Props {
   caregiverName: string;
   patientName: string;
   onGoToPatient: () => void;
-}
-
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-function formatTime(t: string): string {
-  if (!t) return '';
-  const [h, m] = t.split(':').map(Number);
-  const period = h >= 12 ? 'PM' : 'AM';
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${period}`;
-}
-
-function todayLabel() {
-  return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
 interface ScheduleItem {
