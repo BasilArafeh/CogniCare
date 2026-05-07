@@ -27,11 +27,18 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 _REMINDER_REPLY_CONFIRMATION = "Great, noted!"
 
 
+def _normalize_patient_id(raw: str | int) -> str:
+    pid = str(raw).strip()
+    if not pid:
+        raise HTTPException(status_code=422, detail="patient_id must not be empty")
+    return pid
+
+
 @router.post("/voice", response_model=AgentResponse)
 async def agent_voice(req: VoiceMessageRequest) -> AgentResponse:
     try:
         return await orchestrate_message(
-            patient_id=req.patient_id,
+            patient_id=_normalize_patient_id(req.patient_id),
             message=req.message,
             language=req.language,
             run_agent=run_agent,
@@ -45,7 +52,7 @@ async def agent_voice(req: VoiceMessageRequest) -> AgentResponse:
 async def agent_chat(req: ChatMessageRequest) -> AgentResponse:
     try:
         return await orchestrate_message(
-            patient_id=req.patient_id,
+            patient_id=_normalize_patient_id(req.patient_id),
             message=req.message,
             language=req.language,
             run_agent=run_agent,
