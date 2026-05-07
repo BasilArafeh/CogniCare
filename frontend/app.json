@@ -22,8 +22,13 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F5F3FF"
       },
-      "permissions": ["RECORD_AUDIO"]
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
     },
-    "plugins": ["expo-av"]
+    "plugins": [
+      "expo-av",
+      "@react-native-community/datetimepicker"
+    ]
   }
 }

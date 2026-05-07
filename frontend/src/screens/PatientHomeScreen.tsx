@@ -10,17 +10,48 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import { Audio } from 'expo-av';
 import { colors, fonts, withAlpha } from '../theme/colors';
 import apiService from '../services/apiService';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import VoiceOrb from '../components/patient/VoiceOrb';
 import PatientGreeting from '../components/patient/PatientGreeting';
 import DailySummary from '../components/patient/DailySummary';
 import ChatBottomBar from '../components/patient/ChatBottomBar';
 import PatientChatSheet from '../components/patient/PatientChatSheet';
 
-const PATIENT_ID = 'patient_1';
-const PATIENT_NAME = 'Eleanor';
+// WAV / Linear PCM recording options.
+// Raw numeric/string values used to avoid enum import issues across expo-av versions.
+// iOS outputFormat 'lpcm' = IOSOutputFormat.LINEARPCM, audioQuality 96 = IOSAudioQuality.HIGH
+// Android outputFormat 0 = AndroidOutputFormat.DEFAULT, audioEncoder 0 = AndroidAudioEncoder.DEFAULT
+const WAV_RECORDING_OPTIONS = {
+  android: {
+    extension: '.wav',
+    outputFormat: 0,
+    audioEncoder: 0,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 256000,
+  },
+  ios: {
+    extension: '.wav',
+    outputFormat: 'lpcm',
+    audioQuality: 96,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 256000,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {
+    mimeType: 'audio/wav',
+    bitsPerSecond: 256000,
+  },
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any;
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -31,15 +62,26 @@ function getGreeting(): string {
 
 export default function PatientHomeScreen() {
   const insets = useSafeAreaInsets();
+  const route = useRoute<RouteProp<RootStackParamList, 'PatientHome'>>();
+  const { patientId, patientName: PATIENT_NAME } = route.params;
 
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [voiceError, setVoiceError] = useState('');
+  const [responseText, setResponseText] = useState('');
+  const [responseAudioUri, setResponseAudioUri] = useState('');
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
   const summaryAnim = useRef(new Animated.Value(0)).current;
+
+  // Unload sound when screen unmounts
+  React.useEffect(() => {
+    return () => { soundRef.current?.unloadAsync(); };
+  }, []);
 
   const greeting = getGreeting();
 
@@ -74,14 +116,32 @@ export default function PatientHomeScreen() {
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
+      const { recording } = await Audio.Recording.createAsync(WAV_RECORDING_OPTIONS);
       recordingRef.current = recording;
       setIsListening(true);
     } catch (err) {
       setVoiceError('Could not start recording. Please try again.');
       console.warn('startRecording error:', err);
+    }
+  };
+
+  const playResponse = async (uri: string) => {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+      setIsPlaying(true);
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync({ uri });
+      soundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) setIsPlaying(false);
+      });
+      await sound.playAsync();
+    } catch (err) {
+      setIsPlaying(false);
+      console.warn('playResponse error:', err);
     }
   };
 
@@ -95,25 +155,12 @@ export default function PatientHomeScreen() {
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
 
-      if (!uri) {
-        setIsProcessing(false);
-        return;
-      }
+      if (!uri) return;
 
-      const responseUri = await apiService.postVoice(PATIENT_ID, uri);
-
-      // Play response audio
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
-      const { sound } = await Audio.Sound.createAsync({ uri: responseUri });
-      await sound.playAsync();
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync();
-        }
-      });
+      const result = await apiService.sendVoiceRecording(patientId, uri);
+      setResponseText(result.replyText);
+      setResponseAudioUri(result.audioUri);
+      await playResponse(result.audioUri);
     } catch (err) {
       setVoiceError('Voice message failed. Please try again.');
       console.warn('stopAndSend error:', err);
@@ -123,7 +170,7 @@ export default function PatientHomeScreen() {
   };
 
   const handleOrbTap = () => {
-    if (isProcessing) return;
+    if (isProcessing || isPlaying) return;
     if (isListening) {
       stopAndSend();
     } else {
@@ -133,6 +180,8 @@ export default function PatientHomeScreen() {
 
   const orbLabel = isProcessing
     ? 'Processing...'
+    : isPlaying
+    ? 'Playing response...'
     : isListening
     ? 'Tap to stop'
     : 'Tap to speak';
@@ -198,6 +247,24 @@ export default function PatientHomeScreen() {
           </View>
         ) : null}
 
+        {/* Voice response note */}
+        {responseText ? (
+          <View style={styles.voiceNote}>
+            <TouchableOpacity
+              onPress={() => responseAudioUri && playResponse(responseAudioUri)}
+              style={styles.voiceNotePlayBtn}
+              disabled={isPlaying}
+            >
+              <MaterialCommunityIcons
+                name={isPlaying ? 'pause-circle' : 'play-circle'}
+                size={30}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+            <Text style={styles.voiceNoteText}>{responseText}</Text>
+          </View>
+        ) : null}
+
         {/* Summary toggle */}
         <TouchableOpacity onPress={toggleSummary} style={styles.summaryToggle}>
           <MaterialCommunityIcons
@@ -224,6 +291,7 @@ export default function PatientHomeScreen() {
                 },
               ],
               marginBottom: 24,
+              alignSelf: 'stretch',
             }}
           >
             <DailySummary patientName={PATIENT_NAME} />
@@ -241,6 +309,7 @@ export default function PatientHomeScreen() {
         visible={showChat}
         onClose={() => setShowChat(false)}
         patientName={PATIENT_NAME}
+        patientId={patientId}
       />
     </LinearGradient>
   );
@@ -328,5 +397,28 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     paddingTop: 10,
+  },
+  voiceNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: withAlpha(colors.primary, 0.06),
+    borderWidth: 1,
+    borderColor: withAlpha(colors.primary, 0.15),
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  voiceNotePlayBtn: {
+    marginTop: 2,
+  },
+  voiceNoteText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    color: colors.textPrimary,
+    lineHeight: 20,
   },
 });

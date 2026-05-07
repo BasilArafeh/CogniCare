@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, withAlpha } from '../../theme/colors';
+import apiService from '../../services/apiService';
 
 interface ChatMessage {
   id: string;
@@ -29,46 +30,19 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   patientName: string;
+  patientId: number;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    id: '1',
-    text: 'Hello Eleanor! How are you feeling today? 😊',
+function makeGreeting(name: string): ChatMessage {
+  const firstName = name.split(' ')[0] || name;
+  return {
+    id: '0',
+    text: `Hello ${firstName}! How are you feeling today? 😊 You can ask me about your medications, meals, activities, or anything else.`,
     isUser: false,
     timestamp: new Date(),
-  },
-  {
-    id: '2',
-    text: "I'm doing okay, thank you.",
-    isUser: true,
-    timestamp: new Date(),
-  },
-  {
-    id: '3',
-    text: "That's wonderful to hear! Don't forget your morning medication at 8:00 AM. Is there anything I can help you with today?",
-    isUser: false,
-    timestamp: new Date(),
-  },
-];
-
-function getAutoResponse(text: string): string {
-  const lower = text.toLowerCase();
-  if (lower.includes('medication') || lower.includes('medicine') || lower.includes('pill')) {
-    return "Your next medication is Donepezil 10mg at 8:00 PM. Would you like me to set a reminder?";
-  }
-  if (lower.includes('food') || lower.includes('eat') || lower.includes('lunch') || lower.includes('hungry')) {
-    return "Lunch is scheduled for 12:30 PM today. Your dietary preferences have been noted. Enjoy your meal! 🍽️";
-  }
-  if (lower.includes('walk') || lower.includes('exercise') || lower.includes('activity')) {
-    return "Your morning walk is scheduled for 9:00 AM. It's a great activity for staying active and healthy! 🚶";
-  }
-  if (lower.includes('family') || lower.includes('sarah') || lower.includes('call')) {
-    return "You have a family call with Sarah at 3:00 PM. I'll remind you 15 minutes before! 💝";
-  }
-  return "I'm here to help you, Eleanor. You can ask me about your medications, meals, activities, or just have a chat. What's on your mind? 💜";
+  };
 }
 
 function TypingIndicator() {
@@ -104,9 +78,9 @@ function TypingIndicator() {
   );
 }
 
-export default function PatientChatSheet({ visible, onClose, patientName }: Props) {
+export default function PatientChatSheet({ visible, onClose, patientName, patientId }: Props) {
   const insets = useSafeAreaInsets();
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [makeGreeting(patientName)]);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
@@ -119,7 +93,7 @@ export default function PatientChatSheet({ visible, onClose, patientName }: Prop
     if (visible) scrollToBottom();
   }, [visible]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = inputText.trim();
     if (!text || isSending) return;
 
@@ -135,17 +109,26 @@ export default function PatientChatSheet({ visible, onClose, patientName }: Prop
     Keyboard.dismiss();
     scrollToBottom();
 
-    setTimeout(() => {
-      const aiMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: getAutoResponse(text),
-        isUser: false,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
+    try {
+      const reply = await apiService.sendChatMessage(patientId, text);
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), text: reply, isUser: false, timestamp: new Date() },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: "Sorry, I couldn't connect right now. Please try again.",
+          isUser: false,
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
       setIsSending(false);
       scrollToBottom();
-    }, 1200);
+    }
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {

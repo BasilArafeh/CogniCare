@@ -14,6 +14,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { colors, fonts, withAlpha } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { supabase } from '../services/supabaseClient';
+import apiService from '../services/apiService';
 
 type WelcomeNavProp = StackNavigationProp<RootStackParamList, 'Welcome'>;
 
@@ -137,7 +139,22 @@ export default function WelcomeScreen() {
 
           {/* Sign In */}
           <TouchableOpacity
-            onPress={() => {}}
+            onPress={async () => {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user && !session.user.email?.startsWith('pt_')) {
+                const result = await apiService.getCaregiverByAuthId(session.user.id);
+                if (result) {
+                  navigation.navigate('CaregiverDashboard', {
+                    caregiverId: result.caregiverId,
+                    patientId: result.patientId,
+                    caregiverName: result.caregiverName,
+                    patientName: result.patientName,
+                  });
+                  return;
+                }
+              }
+              navigation.navigate('CaregiverSignIn');
+            }}
             activeOpacity={0.87}
             style={[styles.outlineBtn, { marginBottom: 12 }]}
           >
@@ -147,7 +164,20 @@ export default function WelcomeScreen() {
 
           {/* Patient Login */}
           <TouchableOpacity
-            onPress={() => navigation.navigate('PatientHome')}
+            onPress={async () => {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user && session.user.email?.startsWith('pt_')) {
+                const result = await apiService.getPatientByAuthId(session.user.id);
+                if (result) {
+                  navigation.navigate('PatientHome', {
+                    patientId: result.patientId,
+                    patientName: result.patientName,
+                  });
+                  return;
+                }
+              }
+              navigation.navigate('PatientLogin');
+            }}
             activeOpacity={0.87}
             style={styles.ghostBtn}
           >

@@ -6,6 +6,8 @@ import {
   ScrollView,
   Animated,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -214,12 +216,28 @@ export default function CaregiverOnboardingWizardScreen() {
         familyMembers,
         emergencyContacts,
       );
-      await apiService.postSetup(payload);
+      const result = await apiService.postSetup(payload);
+      navigation.reset({
+        index: 0,
+        routes: [{
+          name: 'CaregiverDashboard',
+          params: {
+            patientId: result.patientId,
+            caregiverId: result.caregiverId,
+            caregiverName: caregiverData.name,
+            patientName: [patientData.firstName, patientData.lastName].filter(Boolean).join(' ') || 'Patient',
+          },
+        }],
+      });
     } catch (err: unknown) {
-      console.warn('Setup API error (continuing):', err);
+      console.error('Setup failed:', err);
+      if (err && typeof err === 'object' && 'body' in err) {
+        console.error('Supabase error detail:', JSON.stringify((err as { body: unknown }).body));
+      }
+      const message = err instanceof Error ? err.message : 'Setup failed. Please try again.';
+      Alert.alert('Setup Failed', message);
     } finally {
       setIsSubmitting(false);
-      navigation.reset({ index: 0, routes: [{ name: 'PatientHome' }] });
     }
   };
 
@@ -310,55 +328,61 @@ export default function CaregiverOnboardingWizardScreen() {
         stepIcons={STEP_ICONS}
       />
 
-      {/* Step Content */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      {/* Step Content + Bottom Nav (keyboard-aware) */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
-        <Animated.View
-          style={{
-            opacity: stepOpacity,
-            transform: [{ translateX: stepTranslateX }],
-          }}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {renderStep()}
-        </Animated.View>
-      </ScrollView>
-
-      {/* Bottom Navigation */}
-      {!isLastStep && (
-        <View
-          style={[
-            styles.bottomNav,
-            { paddingBottom: Math.max(insets.bottom, 16) },
-          ]}
-        >
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <MaterialCommunityIcons name="chevron-left" size={20} color={colors.primary} />
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleContinue}
-            activeOpacity={0.85}
-            style={styles.continueWrapper}
+          <Animated.View
+            style={{
+              opacity: stepOpacity,
+              transform: [{ translateX: stepTranslateX }],
+            }}
           >
-            <LinearGradient
-              colors={[colors.primary, colors.primaryMuted]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.continueBtn}
+            {renderStep()}
+          </Animated.View>
+        </ScrollView>
+
+        {/* Bottom Navigation */}
+        {!isLastStep && (
+          <View
+            style={[
+              styles.bottomNav,
+              { paddingBottom: Math.max(insets.bottom, 16) },
+            ]}
+          >
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <MaterialCommunityIcons name="chevron-left" size={20} color={colors.primary} />
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleContinue}
+              activeOpacity={0.85}
+              style={styles.continueWrapper}
             >
-              <Text style={styles.continueText}>
-                {currentStep === TOTAL_STEPS - 2 ? 'Review' : 'Continue'}
-              </Text>
-              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.white} />
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      )}
+              <LinearGradient
+                colors={[colors.primary, colors.primaryMuted]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.continueBtn}
+              >
+                <Text style={styles.continueText}>
+                  {currentStep === TOTAL_STEPS - 2 ? 'Review' : 'Continue'}
+                </Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.white} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+      </KeyboardAvoidingView>
     </LinearGradient>
   );
 }

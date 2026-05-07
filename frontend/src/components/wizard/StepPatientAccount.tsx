@@ -1,5 +1,7 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Platform, StyleSheet } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts, withAlpha } from '../../theme/colors';
 import WizardFormCard from './WizardFormCard';
 import WizardTextField from './WizardTextField';
@@ -27,10 +29,36 @@ const GENDERS = ['Female', 'Male'];
 const STAGES = [
   { label: 'Mild', color: colors.success },
   { label: 'Moderate', color: colors.warning },
-  { label: 'Severe', color: colors.error },
 ];
 
+function parseDob(dob: string): Date {
+  if (dob && /^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+    return new Date(dob + 'T12:00:00');
+  }
+  return new Date(1950, 0, 1);
+}
+
+function formatDobDisplay(dob: string): string {
+  if (!dob) return '';
+  const [y, m, d] = dob.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  });
+}
+
 export default function StepPatientAccount({ data, onChange }: Props) {
+  const [showDobPicker, setShowDobPicker] = useState(false);
+
+  const onDobChange = (_: unknown, selectedDate?: Date) => {
+    if (Platform.OS === 'android') setShowDobPicker(false);
+    if (selectedDate) {
+      const y = selectedDate.getFullYear();
+      const m = (selectedDate.getMonth() + 1).toString().padStart(2, '0');
+      const d = selectedDate.getDate().toString().padStart(2, '0');
+      onChange('dob', `${y}-${m}-${d}`);
+    }
+  };
+
   return (
     <View>
       {/* Patient Identity */}
@@ -140,14 +168,43 @@ export default function StepPatientAccount({ data, onChange }: Props) {
             );
           })}
         </View>
-        <WizardTextField
-          label="Date of Birth"
-          hint="MM/DD/YYYY"
-          value={data.dob}
-          onChangeText={(v) => onChange('dob', v)}
-          prefixIconName="calendar"
-          style={{ marginTop: 14, marginBottom: 0 }}
-        />
+
+        <Text style={[styles.selectLabel, { marginTop: 14 }]}>Date of Birth</Text>
+        <TouchableOpacity
+          onPress={() => setShowDobPicker(true)}
+          style={styles.pickerBtn}
+        >
+          <MaterialCommunityIcons
+            name="calendar"
+            size={18}
+            color={data.dob ? colors.primary : colors.textMuted}
+            style={styles.pickerIcon}
+          />
+          <Text style={[styles.pickerText, !data.dob && styles.pickerPlaceholder]}>
+            {data.dob ? formatDobDisplay(data.dob) : 'Select date of birth'}
+          </Text>
+          <MaterialCommunityIcons name="chevron-down" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {showDobPicker && (
+          <>
+            <DateTimePicker
+              value={parseDob(data.dob)}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              maximumDate={new Date()}
+              onChange={onDobChange}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                onPress={() => setShowDobPicker(false)}
+                style={styles.doneBtn}
+              >
+                <Text style={styles.doneBtnText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </WizardFormCard>
 
       {/* Address & Medical Notes */}
@@ -242,5 +299,40 @@ const styles = StyleSheet.create({
   stageText: {
     fontSize: 13,
     fontFamily: fonts.semiBold,
+  },
+  pickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    borderColor: withAlpha(colors.textMuted, 0.4),
+    backgroundColor: withAlpha(colors.textMuted, 0.06),
+    paddingHorizontal: 14,
+    paddingVertical: 2,
+    minHeight: 50,
+    marginBottom: 4,
+  },
+  pickerIcon: {
+    marginRight: 8,
+  },
+  pickerText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: fonts.regular,
+    color: colors.textPrimary,
+  },
+  pickerPlaceholder: {
+    color: colors.textMuted,
+  },
+  doneBtn: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  doneBtnText: {
+    fontSize: 15,
+    fontFamily: fonts.semiBold,
+    color: colors.primary,
   },
 });

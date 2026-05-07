@@ -97,7 +97,7 @@ export default function StepReviewComplete({
         </LinearGradient>
       </Animated.View>
 
-      <Animated.View style={{ opacity: fadeAnim }}>
+      <Animated.View style={{ opacity: fadeAnim, alignSelf: 'stretch' }}>
         <Text style={styles.readyTitle}>CogniCare is Ready!</Text>
         <Text style={styles.readySubtitle}>
           {caregiverName || 'Caregiver'}'s setup is complete.{'\n'}

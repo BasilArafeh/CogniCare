@@ -1,13 +1,9 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts, withAlpha } from '../../theme/colors';
 import WizardTextField from './WizardTextField';
+import TimePickerModal from '../TimePickerModal';
 
 export interface MedicationItem {
   id: string;
@@ -23,6 +19,15 @@ function makeId() {
 
 function emptyMed(): MedicationItem {
   return { id: makeId(), name: '', dosage: '', time: '', notes: '' };
+}
+
+function formatTime12h(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  const h = parseInt(hStr, 10);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${mStr} ${period}`;
 }
 
 interface Props {
@@ -43,6 +48,8 @@ function MedCard({
   onUpdate: (field: keyof MedicationItem, value: string) => void;
   onRemove: () => void;
 }) {
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -58,6 +65,7 @@ function MedCard({
           </TouchableOpacity>
         )}
       </View>
+
       <WizardTextField
         label="Medication Name *"
         hint="e.g. Donepezil"
@@ -65,26 +73,45 @@ function MedCard({
         onChangeText={(v) => onUpdate('name', v)}
         prefixIconName="pill"
       />
+
       <View style={styles.row}>
         <View style={{ flex: 1, marginRight: 8 }}>
           <WizardTextField
             label="Dosage"
-            hint="e.g. 10mg"
+            hint="e.g. 10"
             value={item.dosage}
             onChangeText={(v) => onUpdate('dosage', v)}
+            keyboardType="decimal-pad"
             prefixIconName="weight"
           />
         </View>
         <View style={{ flex: 1 }}>
-          <WizardTextField
-            label="Time"
-            hint="e.g. 8:00 PM"
-            value={item.time}
-            onChangeText={(v) => onUpdate('time', v)}
-            prefixIconName="clock-outline"
-          />
+          <Text style={styles.fieldLabel}>Time</Text>
+          <TouchableOpacity
+            onPress={() => setShowTimePicker(true)}
+            style={styles.pickerBtn}
+          >
+            <MaterialCommunityIcons
+              name="clock-outline"
+              size={18}
+              color={item.time ? colors.primary : colors.textMuted}
+              style={styles.pickerIcon}
+            />
+            <Text style={[styles.pickerText, !item.time && styles.pickerPlaceholder]}>
+              {item.time ? formatTime12h(item.time) : 'Select time'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      <TimePickerModal
+        visible={showTimePicker}
+        initialTime={item.time}
+        title="Medication Time"
+        onConfirm={(t) => { onUpdate('time', t); setShowTimePicker(false); }}
+        onCancel={() => setShowTimePicker(false)}
+      />
+
       <WizardTextField
         label="Notes"
         hint="Any special instructions..."
@@ -192,6 +219,36 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontFamily: fonts.semiBold,
+    color: colors.textSecondary,
+    marginBottom: 6,
+  },
+  pickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    borderColor: withAlpha(colors.textMuted, 0.4),
+    backgroundColor: withAlpha(colors.textMuted, 0.06),
+    paddingHorizontal: 14,
+    paddingVertical: 2,
+    minHeight: 50,
+    marginBottom: 14,
+  },
+  pickerIcon: {
+    marginRight: 8,
+  },
+  pickerText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: fonts.regular,
+    color: colors.textPrimary,
+  },
+  pickerPlaceholder: {
+    color: colors.textMuted,
   },
   addBtn: {
     flexDirection: 'row',

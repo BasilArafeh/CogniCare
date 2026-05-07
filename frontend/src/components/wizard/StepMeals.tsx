@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts, withAlpha } from '../../theme/colors';
-import WizardTextField from './WizardTextField';
+import TimePickerModal from '../TimePickerModal';
 
 export interface MealItem {
   id: string;
@@ -10,6 +10,8 @@ export interface MealItem {
   mealTime: string;
   notes: string;
 }
+
+const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
 function makeId() {
   return Math.random().toString(36).slice(2, 9);
@@ -21,6 +23,15 @@ function emptyMeal(): MealItem {
 
 export function initialMeals(): MealItem[] {
   return [emptyMeal()];
+}
+
+function formatTime12h(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  const h = parseInt(hStr, 10);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${mStr} ${period}`;
 }
 
 interface Props {
@@ -41,6 +52,8 @@ function MealCard({
   onUpdate: (field: keyof MealItem, value: string) => void;
   onRemove: () => void;
 }) {
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -48,7 +61,7 @@ function MealCard({
           <MaterialCommunityIcons name="silverware-fork-knife" size={18} color={colors.primary} />
         </View>
         <Text style={styles.cardTitle}>
-          {item.mealName.trim() || `Meal ${index + 1}`}
+          {item.mealName || `Meal ${index + 1}`}
         </Text>
         {canRemove && (
           <TouchableOpacity onPress={onRemove} style={styles.removeBtn}>
@@ -56,29 +69,46 @@ function MealCard({
           </TouchableOpacity>
         )}
       </View>
-      <WizardTextField
-        label="Meal Name *"
-        hint="e.g. Breakfast, Lunch, Dinner"
-        value={item.mealName}
-        onChangeText={(v) => onUpdate('mealName', v)}
-        prefixIconName="silverware-fork-knife"
-      />
-      <WizardTextField
-        label="Meal Time"
-        hint="e.g. 8:00 AM"
-        value={item.mealTime}
-        onChangeText={(v) => onUpdate('mealTime', v)}
-        prefixIconName="clock-outline"
-      />
-      <WizardTextField
-        label="Notes"
-        hint="Any additional notes..."
-        value={item.notes}
-        onChangeText={(v) => onUpdate('notes', v)}
-        prefixIconName="note-text"
-        multiline
-        numberOfLines={2}
-        style={{ marginBottom: 0 }}
+
+      <Text style={styles.fieldLabel}>Meal Type *</Text>
+      <View style={styles.pillRow}>
+        {MEAL_TYPES.map((type) => {
+          const selected = item.mealName === type;
+          return (
+            <TouchableOpacity
+              key={type}
+              onPress={() => onUpdate('mealName', type)}
+              style={[styles.pill, selected && styles.pillSelected]}
+            >
+              <Text style={[styles.pillText, selected && styles.pillTextSelected]}>{type}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.fieldLabel, { marginTop: 4 }]}>Meal Time</Text>
+      <TouchableOpacity
+        onPress={() => setShowTimePicker(true)}
+        style={styles.pickerBtn}
+      >
+        <MaterialCommunityIcons
+          name="clock-outline"
+          size={18}
+          color={item.mealTime ? colors.primary : colors.textMuted}
+          style={styles.pickerIcon}
+        />
+        <Text style={[styles.pickerText, !item.mealTime && styles.pickerPlaceholder]}>
+          {item.mealTime ? formatTime12h(item.mealTime) : 'Select time'}
+        </Text>
+        <MaterialCommunityIcons name="chevron-down" size={18} color={colors.textMuted} />
+      </TouchableOpacity>
+
+      <TimePickerModal
+        visible={showTimePicker}
+        initialTime={item.mealTime}
+        title="Meal Time"
+        onConfirm={(t) => { onUpdate('mealTime', t); setShowTimePicker(false); }}
+        onCancel={() => setShowTimePicker(false)}
       />
     </View>
   );
@@ -162,6 +192,62 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   removeBtn: { padding: 4 },
+  fieldLabel: {
+    fontSize: 13,
+    fontFamily: fonts.semiBold,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: withAlpha(colors.textMuted, 0.4),
+    backgroundColor: withAlpha(colors.textMuted, 0.06),
+  },
+  pillSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  pillText: {
+    fontSize: 13,
+    fontFamily: fonts.semiBold,
+    color: colors.textSecondary,
+  },
+  pillTextSelected: {
+    color: colors.white,
+  },
+  pickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    borderColor: withAlpha(colors.textMuted, 0.4),
+    backgroundColor: withAlpha(colors.textMuted, 0.06),
+    paddingHorizontal: 14,
+    paddingVertical: 2,
+    minHeight: 50,
+    marginBottom: 4,
+  },
+  pickerIcon: {
+    marginRight: 8,
+  },
+  pickerText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: fonts.regular,
+    color: colors.textPrimary,
+  },
+  pickerPlaceholder: {
+    color: colors.textMuted,
+  },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
