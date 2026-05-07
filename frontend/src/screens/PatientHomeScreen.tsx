@@ -294,7 +294,7 @@ export default function PatientHomeScreen() {
               alignSelf: 'stretch',
             }}
           >
-            <DailySummary patientName={PATIENT_NAME} />
+            <DailySummary patientId={patientId} />
           </Animated.View>
         )}
       </ScrollView>

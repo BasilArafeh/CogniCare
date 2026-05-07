@@ -115,7 +115,8 @@ export default function PatientChatSheet({ visible, onClose, patientName, patien
         ...prev,
         { id: (Date.now() + 1).toString(), text: reply, isUser: false, timestamp: new Date() },
       ]);
-    } catch {
+    } catch (err) {
+      console.error('[Chat] sendChatMessage failed:', err);
       setMessages((prev) => [
         ...prev,
         {

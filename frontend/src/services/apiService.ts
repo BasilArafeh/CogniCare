@@ -168,7 +168,7 @@ export interface PatientRow {
 }
 
 interface PatientMedRow {
-  patient_medication_id: number;
+  patient_medications_id: number;
   medication_id: number;
   patient_id: number;
   medication_time: string;
@@ -317,9 +317,9 @@ class ApiService {
   //   GET  /health
   //        → 200 { status: "ok" }
   //
-  //   POST /chat
-  //        Body: { patient_id: number, message: string }
-  //        → 200 { reply: string }
+  //   POST /agent/chat
+  //        Body: { patient_id: string, message: string, language: string }
+  //        → 200 { response: string, patient_id: string }
   //
   //   POST /voice
   //        Body: multipart/form-data  { patient_id: number, audio: File (WAV) }
@@ -338,12 +338,15 @@ class ApiService {
     }
   }
 
-  async sendChatMessage(patientId: number, message: string): Promise<string> {
-    const { data } = await this.rag.post<{ reply: string }>('/chat', {
-      patient_id: patientId,
+  async sendChatMessage(patientId: number, message: string, language = 'en'): Promise<string> {
+    console.log('[API] sendChatMessage: POST /agent/chat | patient_id =', patientId, '| language =', language, '| message =', message);
+    const { data } = await this.rag.post<{ response: string }>('/agent/chat', {
+      patient_id: String(patientId),
       message,
+      language,
     });
-    return data.reply;
+    console.log('[API] sendChatMessage: reply =', data.response);
+    return data.response;
   }
 
   async sendVoiceRecording(
@@ -598,7 +601,7 @@ class ApiService {
             first_name: f.first_name,
             last_name: (f.last_name as string) || '',
             relationship: orNull(f.relationship),
-            contact_no: orNull(f.contact_no),
+            contact_no: orNull(f.contactNo),
           })),
         );
         console.log('[API] postSetup: family members inserted');
@@ -682,7 +685,7 @@ class ApiService {
         `/patient_medications?patient_id=eq.${patientId}&select=*,medication(*)`,
       );
       return data.map((r) => ({
-        patientMedicationId: r.patient_medication_id,
+        patientMedicationId: r.patient_medications_id,
         medicationId: r.medication_id,
         name: r.medication?.medication_name ?? '',
         dosage: r.dosage ?? null,
@@ -778,7 +781,7 @@ class ApiService {
   // ─── Dashboard DELETE ─────────────────────────────────────────────────────
 
   async deleteMedication(patientMedicationId: number, _medicationId: number): Promise<void> {
-    await this.db.delete(`/patient_medications?patient_medication_id=eq.${patientMedicationId}`);
+    await this.db.delete(`/patient_medications?patient_medications_id=eq.${patientMedicationId}`);
   }
 
   async deleteMeal(patientMealId: number, _mealId: number): Promise<void> {
@@ -796,7 +799,7 @@ class ApiService {
     name: string, dosage: string, time: string, notes: string,
   ): Promise<void> {
     const medicationId = await this.findOrCreateMedicationId(name, notes);
-    await this.db.patch(`/patient_medications?patient_medication_id=eq.${patientMedicationId}`, {
+    await this.db.patch(`/patient_medications?patient_medications_id=eq.${patientMedicationId}`, {
       medication_id: medicationId,
       medication_time: toTime(time) ?? '00:00:00',
       dosage: orNull(dosage),

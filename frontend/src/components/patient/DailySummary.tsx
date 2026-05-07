@@ -1,55 +1,28 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts, withAlpha } from '../../theme/colors';
+import apiService from '../../services/apiService';
+import { formatTime } from '../../utils/time';
 
 interface Props {
-  patientName: string;
+  patientId: number;
 }
 
 interface SummaryItem {
+  key: string;
   icon: string;
   iconColor: string;
   title: string;
   detail: string;
   time: string;
-  hour: number; // 0-23 for comparison
+  hour: number;
 }
 
-const ITEMS: SummaryItem[] = [
-  {
-    icon: 'pill',
-    iconColor: colors.primary,
-    title: 'Medication',
-    detail: 'Donepezil 10mg',
-    time: '8:00 PM',
-    hour: 20,
-  },
-  {
-    icon: 'silverware-fork-knife',
-    iconColor: colors.secondary,
-    title: 'Meal',
-    detail: 'Lunch',
-    time: '12:30 PM',
-    hour: 12,
-  },
-  {
-    icon: 'shoe-sneaker',
-    iconColor: '#F59E0B',
-    title: 'Activity',
-    detail: 'Morning Walk',
-    time: '9:00 AM',
-    hour: 9,
-  },
-  {
-    icon: 'phone',
-    iconColor: colors.primaryDark,
-    title: 'Family Call',
-    detail: 'Sarah',
-    time: '3:00 PM',
-    hour: 15,
-  },
-];
+function hourFromTime(t: string): number {
+  if (!t) return 0;
+  return parseInt(t.split(':')[0], 10);
+}
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString('en-US', {
@@ -59,9 +32,60 @@ function formatDate(d: Date): string {
   });
 }
 
-export default function DailySummary({ patientName }: Props) {
+export default function DailySummary({ patientId }: Props) {
+  const [items, setItems] = useState<SummaryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const now = new Date();
   const currentHour = now.getHours();
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const [meds, meals, activities] = await Promise.all([
+        apiService.getPatientMedications(patientId),
+        apiService.getPatientMeals(patientId),
+        apiService.getPatientActivities(patientId),
+      ]);
+
+      if (cancelled) return;
+
+      const summaryItems: SummaryItem[] = [
+        ...meds.map((m) => ({
+          key: `med-${m.patientMedicationId}`,
+          icon: 'pill',
+          iconColor: colors.primary,
+          title: 'Medication',
+          detail: m.dosage ? `${m.name} ${m.dosage}` : m.name,
+          time: formatTime(m.time),
+          hour: hourFromTime(m.time),
+        })),
+        ...meals.map((m) => ({
+          key: `meal-${m.patientMealId}`,
+          icon: 'silverware-fork-knife',
+          iconColor: colors.secondary,
+          title: 'Meal',
+          detail: m.mealType,
+          time: formatTime(m.mealTime),
+          hour: hourFromTime(m.mealTime),
+        })),
+        ...activities.map((a) => ({
+          key: `act-${a.patientActivityId}`,
+          icon: 'shoe-sneaker',
+          iconColor: '#F59E0B',
+          title: 'Activity',
+          detail: a.description ? `${a.name} — ${a.description}` : a.name,
+          time: formatTime(a.startTime),
+          hour: hourFromTime(a.startTime),
+        })),
+      ].sort((a, b) => a.hour - b.hour);
+
+      setItems(summaryItems);
+      setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [patientId]);
 
   return (
     <View style={styles.card}>
@@ -80,48 +104,57 @@ export default function DailySummary({ patientName }: Props) {
 
       <View style={styles.divider} />
 
-      {/* Items */}
-      {ITEMS.map((item) => {
-        const isDone = item.hour < currentHour;
-        return (
-          <View key={item.title} style={styles.row}>
-            <View
-              style={[
-                styles.iconCircle,
-                { backgroundColor: withAlpha(item.iconColor, 0.12) },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name={item.icon as any}
-                size={18}
-                color={isDone ? colors.textMuted : item.iconColor}
-              />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
+      {loading ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : items.length === 0 ? (
+        <View style={styles.emptyRow}>
+          <Text style={styles.emptyText}>No schedule for today</Text>
+        </View>
+      ) : (
+        items.map((item) => {
+          const isDone = item.hour < currentHour;
+          return (
+            <View key={item.key} style={styles.row}>
+              <View
                 style={[
-                  styles.rowTitle,
-                  isDone && styles.textStrike,
+                  styles.iconCircle,
+                  { backgroundColor: withAlpha(item.iconColor, 0.12) },
                 ]}
               >
-                {item.detail}
-              </Text>
-              <Text style={styles.rowMeta}>
-                {item.title} · {item.time}
-              </Text>
-            </View>
-            {isDone ? (
-              <View style={styles.doneBadge}>
-                <Text style={styles.doneText}>Done</Text>
+                <MaterialCommunityIcons
+                  name={item.icon as any}
+                  size={18}
+                  color={isDone ? colors.textMuted : item.iconColor}
+                />
               </View>
-            ) : (
-              <Text style={[styles.timeLabel, { color: item.iconColor }]}>
-                {item.time}
-              </Text>
-            )}
-          </View>
-        );
-      })}
+              <View style={styles.rowContent}>
+                <Text
+                  style={[
+                    styles.rowTitle,
+                    isDone && styles.textStrike,
+                  ]}
+                >
+                  {item.detail}
+                </Text>
+                <Text style={styles.rowMeta}>
+                  {item.title} · {item.time}
+                </Text>
+              </View>
+              {isDone ? (
+                <View style={styles.doneBadge}>
+                  <Text style={styles.doneText}>Done</Text>
+                </View>
+              ) : (
+                <Text style={[styles.timeLabel, { color: item.iconColor }]}>
+                  {item.time}
+                </Text>
+              )}
+            </View>
+          );
+        })
+      )}
     </View>
   );
 }
@@ -172,6 +205,19 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: withAlpha(colors.primaryMuted, 0.15),
     marginHorizontal: 16,
+  },
+  loadingRow: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyRow: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    color: colors.textMuted,
   },
   row: {
     flexDirection: 'row',
