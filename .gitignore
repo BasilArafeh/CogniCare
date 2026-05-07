@@ -7,3 +7,5 @@ rag/vectorstore/
 rag/data/processed/
 rag/data/raw/
 *.sqlite3
+__init__.py
+node_modules/
