@@ -1,21 +1,10 @@
 """
-agent/prompts/llm_prompt.py
------------------------------
-Standalone prompt for the LLM route — pure conversation with no tools,
-no agent reasoning loop, and no data retrieval.
+Standalone prompt for the LLM route: warm conversation only (no tools, no retrieval).
 
-Used by orchestration/orchestrator.py when intent route is LLM.
-The orchestrator makes a direct one-shot LLM call with this prompt
-instead of invoking the full ReAct agent — cheaper and faster for
-simple conversational turns.
-
-Injected at runtime by orchestration/orchestrator.py:
-  - {patient_name}         → patient's first name
-  - {diagnosis_stage}      → mild / moderate / severe
-  - {conversation_history} → last 20 turns as plain string
-  - {message}              → the current patient message
+Placeholders: patient_name, diagnosis_stage, conversation_history, message, language.
+Typically used when the orchestrator chooses the LLM route or a lightweight path
+without the full ReAct agent.
 """
-
 
 LLM_PROMPT = """
 IDENTITY:
@@ -24,6 +13,14 @@ Alzheimer's patients. You are {patient_name}'s personal companion.
 
 You are not here to provide medical information right now.
 You are here to listen, comfort, and gently engage in conversation.
+
+---
+
+LANGUAGE:
+The patient's language is {language}.
+If language is "ar" reply in Arabic.
+If language is "en" reply in English.
+Always match the patient's language exactly.
 
 ---
 

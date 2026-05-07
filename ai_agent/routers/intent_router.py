@@ -1,25 +1,29 @@
 """
-agent/router/intent_router.py
-------------------------------
-Classifies incoming patient messages into one of six routes:
-DB, RAG, DB_RAG, LLM, CLARIFY, EMERGENCY.
+Classifies patient messages into routes: DB, RAG, DB_RAG, LLM, CLARIFY, EMERGENCY.
 
-Calls get_recent_turns() from memory_manager for context before classification.
-Returns a structured dict consumed by orchestrator.py.
+SQL strings are raw LLM output; callers must validate with tools/sql_validator before execution.
 
-Note: SQL returned here is raw LLM output.
-      Validation happens in tools/sql_validator.py before any execution.
+Orchestrator should call get_recent_turns() first and pass recent_history into route_intent.
 """
 
 import json
 import logging
 
-from agent.core.connections import async_openai_client
-from agent.prompts.intent_prompt import INTENT_ROUTER_PROMPT
+from core.config import config
+from core.connections import async_openai_client
+from prompts.intent_prompt import INTENT_ROUTER_PROMPT
 
 logger = logging.getLogger(__name__)
 
 VALID_ROUTES = {"DB", "RAG", "DB_RAG", "LLM", "CLARIFY", "EMERGENCY"}
+
+# Fallback keyword set when OpenAI fails - still escalate physical-danger language.
+EMERGENCY_KEYWORDS = {
+    "fell", "fall", "fallen", "help", "pain", "hurt", "hurts",
+    "breathe", "breathing", "emergency", "bleeding", "bleed",
+    "heart", "attack", "chest", "dying", "die", "can't move",
+    "can't get up", "unconscious", "fainted", "choking",
+}
 
 CLARIFY_FALLBACK = {
     "route": "CLARIFY",
@@ -30,130 +34,165 @@ CLARIFY_FALLBACK = {
         "time_references": [],
         "activities": [],
         "emotions": [],
-        "medical_concepts": []
+        "medical_concepts": [],
     },
     "sql": None,
     "confidence": "low",
-    "reasoning": "Failed to parse router response — defaulting to CLARIFY."
+    "reasoning": "Failed to parse router response; defaulting to CLARIFY.",
+}
+
+EMERGENCY_FALLBACK = {
+    "route": "EMERGENCY",
+    "entities": {
+        "medication_names": [],
+        "symptoms": [],
+        "body_parts": [],
+        "time_references": [],
+        "activities": [],
+        "emotions": [],
+        "medical_concepts": [],
+    },
+    "sql": None,
+    "confidence": "high",
+    "reasoning": "Emergency keywords detected in message - API failure fallback.",
 }
 
 
+# Fallback only: detects danger-related words when the model or JSON parsing fails.
+def _is_emergency_message(message: str) -> bool:
+    """
+    Lightweight keyword check used ONLY as a fallback when the OpenAI
+    API call fails or JSON parsing fails.
+    """
+    words = set(message.lower().split())
+    return bool(words & EMERGENCY_KEYWORDS)
+
+
+# Calls the classifier model (intent_router_model from config) with INTENT_ROUTER_PROMPT and returns route + metadata.
 async def route_intent(
     message: str,
     recent_history: str,
-    patient_id: int
+    patient_id: str,
 ) -> dict:
     """
-    Classifies a patient message into one of six routes:
-    DB, RAG, DB_RAG, LLM, CLARIFY, EMERGENCY.
-
-    Args:
-        message:        The current patient message.
-        recent_history: Last 2-3 conversation turns as a plain string.
-        patient_id:     The active patient's ID for SQL generation.
-
-    Returns:
-        A dict containing route, entities, sql, confidence, and reasoning.
+    Classifies a patient message. On API/parse/validation failures, uses
+    EMERGENCY_FALLBACK if emergency keywords match, otherwise CLARIFY_FALLBACK.
     """
-
-    # Step 1: Format the prompt with runtime values
     prompt = INTENT_ROUTER_PROMPT.format(
         message=message,
         recent_history=recent_history if recent_history else "No history yet.",
-        patient_id=patient_id
+        patient_id=patient_id,
     )
 
-    # Step 2: Call OpenAI
     try:
         response = await async_openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0,      # deterministic — consistent classification
-            max_tokens=800,     # SQL JOINs can be verbose
-            response_format={"type": "json_object"}
+            model=config.intent_router_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=800,
+            response_format={"type": "json_object"},
         )
 
         raw_output = response.choices[0].message.content
 
-    except Exception as e:
-        logger.error(f"OpenAI API call failed: {e}")
+    except Exception:
+        logger.exception("OpenAI API call failed during intent routing (patient_id=%s)", patient_id)
+        if _is_emergency_message(message):
+            logger.warning(
+                "Emergency keyword fallback after API failure (patient_id=%s)",
+                patient_id,
+            )
+            return EMERGENCY_FALLBACK
         return CLARIFY_FALLBACK
 
-    # Step 3: Parse the JSON response
+    if not raw_output or not raw_output.strip():
+        logger.error(
+            "Intent router returned empty content (patient_id=%s)",
+            patient_id,
+        )
+        if _is_emergency_message(message):
+            return EMERGENCY_FALLBACK
+        return CLARIFY_FALLBACK
+
     try:
         result = json.loads(raw_output)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse router JSON output: {e}\nRaw output: {raw_output}")
+    except json.JSONDecodeError:
+        logger.exception(
+            "Failed to parse intent router JSON (patient_id=%s, raw_len=%s)",
+            patient_id,
+            len(raw_output),
+        )
+        logger.debug("Intent router raw output sample: %.500s", raw_output)
+        if _is_emergency_message(message):
+            logger.warning(
+                "Emergency keyword fallback after JSON parse failure (patient_id=%s)",
+                patient_id,
+            )
+            return EMERGENCY_FALLBACK
         return CLARIFY_FALLBACK
 
-    # Step 4: Validate the result
-    validated = _validate_result(result)
-    if not validated:
-        logger.error(f"Router result failed validation: {result}")
+    if not _validate_result(result):
+        logger.error(
+            "Intent router output failed validation: patient_id=%s payload=%s",
+            patient_id,
+            result,
+        )
+        if _is_emergency_message(message):
+            return EMERGENCY_FALLBACK
         return CLARIFY_FALLBACK
 
-    # Step 5: Log the routing decision
     logger.info(
-        f"[ROUTER] patient_id={patient_id} | "
-        f"route={result['route']} | "
-        f"confidence={result['confidence']} | "
-        f"reasoning={result['reasoning']}"
+        "Intent routed: patient_id=%s route=%s confidence=%s reasoning=%s",
+        patient_id,
+        result["route"],
+        result["confidence"],
+        result["reasoning"],
     )
 
     return result
 
 
+# Ensures required keys, enums, EMERGENCY confidence, DB SQL rules, and entity lists exist.
 def _validate_result(result: dict) -> bool:
-    """
-    Validates the router output has all required fields and valid values.
-
-    Args:
-        result: The parsed JSON dict from the LLM.
-
-    Returns:
-        True if valid, False otherwise.
-    """
-
-    # Check required fields exist
+    """Returns True if result is usable; patches missing entity keys and EMERGENCY confidence."""
     required_fields = ["route", "entities", "sql", "confidence", "reasoning"]
     for field in required_fields:
         if field not in result:
-            logger.error(f"Missing required field in router output: {field}")
+            logger.error("Intent router missing field: %s", field)
             return False
 
-    # Check route is valid
     if result["route"] not in VALID_ROUTES:
-        logger.error(f"Invalid route returned: {result['route']}")
+        logger.error("Intent router invalid route: %s", result.get("route"))
         return False
 
-    # Check confidence is valid
     if result["confidence"] not in {"high", "medium", "low"}:
-        logger.error(f"Invalid confidence value: {result['confidence']}")
+        logger.error("Intent router invalid confidence: %s", result.get("confidence"))
         return False
 
-    # Check SQL is present for DB and DB_RAG routes
+    if result["route"] == "EMERGENCY":
+        result["confidence"] = "high"
+
     if result["route"] in {"DB", "DB_RAG"} and not result["sql"]:
-        logger.error(f"Missing SQL for route: {result['route']}")
+        logger.error("Intent router missing sql for DB route: %s", result["route"])
         return False
 
-    # Check SQL is null for non-DB routes
     if result["route"] not in {"DB", "DB_RAG"} and result["sql"] is not None:
-        logger.warning(f"SQL present for non-DB route {result['route']} — clearing it.")
+        logger.warning(
+            "SQL present on non-DB route %s; clearing sql field.",
+            result["route"],
+        )
         result["sql"] = None
 
-    # Check entities structure
     required_entity_keys = {
         "medication_names", "symptoms", "body_parts",
-        "time_references", "activities", "emotions", "medical_concepts"
+        "time_references", "activities", "emotions", "medical_concepts",
     }
     if not isinstance(result["entities"], dict):
-        logger.error("Entities field is not a dict.")
+        logger.error("Intent router entities is not a dict")
         return False
 
     for key in required_entity_keys:
         if key not in result["entities"]:
-            result["entities"][key] = []  # auto-fill missing entity lists
+            result["entities"][key] = []
 
     return True
