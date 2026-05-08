@@ -11,3 +11,7 @@ class AgentAlertSessionResponse(BaseModel):
     patient_id: int
     caregiver_id: int | None = None
     responded: bool
+
+class TestSMSRequest(BaseModel):
+    to_number: str
+    message: str
