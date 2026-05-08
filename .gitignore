@@ -23,6 +23,18 @@ venv/
 Thumbs.db
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# Python (backend2 + ai_agent + rag)
+pip-wheel-metadata/
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.pyre/
+.pytype/
+.ipynb_checkpoints/
 
 # JavaScript / TypeScript (frontend/backend2)
 node_modules/
@@ -32,10 +44,21 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Expo / React Native local state
+# Expo / React Native
 .expo/
 .expo-shared/
+android/
+ios/
 
-# Common JS build outputs
+# Frontend build/test outputs
 .next/
 coverage/
+web-build/
+storybook-static/
+
+# Runtime / local temp
+*.log
+*.pid
+*.out
+tmp/
+temp/

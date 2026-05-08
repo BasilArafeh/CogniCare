@@ -136,7 +136,7 @@ The following tables and columns are available for SQL generation.
 Use only tables listed below (plus joins between them).
 For every patient-specific query include a predicate like:
 
-    WHERE patient_id = '<paste the PATIENT ID value shown at the bottom, in single quotes>'
+    WHERE patient_id = {patient_id}
 
 Use single SELECT statements only. Do not reference interaction_log,
  or long_term_memory.
@@ -144,20 +144,24 @@ Use single SELECT statements only. Do not reference interaction_log,
 --------------------------------------------------
 patients
 --------------------------------------------------
-patient_id, first_name, last_name, gender, dob,
-address, contact_no, emergency_contact, diagnosis_stage
+patient_id, first_name, last_name
 
 
 --------------------------------------------------
 patient_memory
 --------------------------------------------------
-Stores patient-facing profile / recalled context (use when the question
-needs structured memory about the patient). Join or filter using patient_id.
+patient_id, preferred_name, preferred_language, communication_profile,
+orientation_cues, other_conditions, allergies, dietary_notes,
+known_triggers, calming_strategies, confusion_patterns, important_people,
+comfort_topics, avoid_topics, safety_notes, escalation_notes
+Note: For questions about family members or relationships, prefer joining
+the family_member table. Use patient_memory.important_people for unstructured
+personal memory only.
 
 --------------------------------------------------
 caregiver
 --------------------------------------------------
-caregiver_id, first_name, last_name, contact_no, role
+caregiver_id, patient_id, first_name, last_name, contact_no, role
 Note: To filter by patient, join through caregiver_priority (caregiver_id)
 or use family_member as appropriate for the question.
 
@@ -174,14 +178,6 @@ alerts
 --------------------------------------------------
 alert_id, caregiver_id, alert_time, alert_type,
 resolved_time, resolved
-
-Note: Join with caregiver to filter by patient_id
-
-
---------------------------------------------------
-report
---------------------------------------------------
-report_id, caregiver_id, report_date, description
 
 Note: Join with caregiver to filter by patient_id
 
@@ -296,7 +292,7 @@ The JSON must follow this exact structure:
         "emotions": [],
         "medical_concepts": []
     }},
-    "sql": "SELECT ... FROM ... WHERE patient_id = '{patient_id}'" | null,
+    "sql": "SELECT ... FROM ... WHERE patient_id = {patient_id}" | null,
     "confidence": "high" | "medium" | "low",
     "reasoning": "one sentence explaining the routing decision"
 }}
@@ -305,8 +301,8 @@ Rules:
 - "route" is always required
 - "entities" is always required — use empty lists if nothing extracted
 - "sql" is required when route is DB or DB_RAG, null for all other routes
-- When sql is present, use the PATIENT ID at the bottom inside single quotes:
-  WHERE patient_id = '<uuid-from-patient-id-field>'
+- When sql is present, use the PATIENT ID at the bottom as an integer:
+  WHERE patient_id = {patient_id}
 - "confidence" is always required
 - "reasoning" is always required — one sentence maximum
 - If route is EMERGENCY, sql is always null
