@@ -135,6 +135,33 @@ def load_full_memory(patient_id: str) -> dict[str, Any]:
         return {"history": [], "profile": {}}
 
 
+# Fast path for per-turn orchestration: fetch only patient profile memory.
+def load_patient_profile(patient_id: str) -> dict[str, Any]:
+    if supabase_client is None:
+        logger.warning(
+            "load_patient_profile skipped: Supabase is not configured (patient_id=%s).",
+            patient_id,
+        )
+        return {}
+    try:
+        memory_response = (
+            supabase_client.table("patient_memory")
+            .select("*")
+            .eq("patient_id", patient_id)
+            .maybe_single()
+            .execute()
+        )
+        raw_profile = memory_response.data
+        if raw_profile is None:
+            return {}
+        if isinstance(raw_profile, list):
+            return raw_profile[0] if raw_profile else {}
+        return raw_profile
+    except Exception:
+        logger.exception("Failed to load patient profile for patient_id=%s", patient_id)
+        return {}
+
+
 # Writes one completed user message + assistant reply to interaction_log after a turn finishes.
 def save_interaction(
     patient_id: str,

@@ -7,13 +7,25 @@ or: ``uvicorn main:app --host 0.0.0.0 --port 8000``
 from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from orchestration.agent_executor import run_agent
+from orchestration.orchestrator import orchestrate_message
 from routers.agent import router as agent_router
 from scheduler.scheduler import shutdown_scheduler, start_scheduler
+from schemas.agent_schemas import AgentResponse, ChatMessageRequest, VoiceMessageRequest
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_patient_id(raw: str | int) -> str:
+    pid = str(raw).strip()
+    if not pid:
+        raise ValueError("patient_id must not be empty")
+    return pid
 
 
 @asynccontextmanager
@@ -38,6 +50,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(agent_router)
+
+
+@app.post("/voice", response_model=AgentResponse, include_in_schema=False)
+async def legacy_voice(req: VoiceMessageRequest) -> AgentResponse:
+    return await orchestrate_message(
+        patient_id=_normalize_patient_id(req.patient_id),
+        message=req.message,
+        language=req.language,
+        run_agent=run_agent,
+    )
+
+
+@app.post("/chat", include_in_schema=False)
+async def legacy_chat(req: ChatMessageRequest) -> dict[str, str]:
+    """
+    Backward-compatible frontend contract:
+    returns { "reply": "<text>" } while also exposing modern fields.
+    """
+    result = await orchestrate_message(
+        patient_id=_normalize_patient_id(req.patient_id),
+        message=req.message,
+        language=req.language,
+        run_agent=run_agent,
+    )
+    return {
+        "reply": result.response,
+        "response": result.response,
+        "patient_id": result.patient_id,
+    }
 
 
 @app.get("/health")

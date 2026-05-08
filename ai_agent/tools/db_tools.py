@@ -83,6 +83,7 @@ def _pipeline(
 ) -> str:
     """Validate → execute SELECT → summarize; never leaks internals."""
     sql_query = sql_query.strip()
+    logger.info("Executing SQL: %s", sql_query)
     ok, err = validate_sql(sql_query, patient_id)
     if not ok:
         logger.error("SQL rejected before run: %s", err)
@@ -107,6 +108,7 @@ def _pipeline(
 def create_database_tools(
     patient_id: str,
     patient_first_name: str,
+    sql_query: str,
 ) -> list[Any]:
     """
     Returns tools for the ReAct loop. Primary entry: pass intent-router SQL + the user question.
@@ -115,20 +117,26 @@ def create_database_tools(
     """
     pid = patient_id.strip()
     name = patient_first_name.strip()
+    routed_sql = (sql_query or "").strip()
 
     @lc_tool
-    def query_personal_health_data(question: str, sql_query: str) -> str:
+    def query_personal_health_data(question: str) -> str:
         """
         Run the authorized SELECT/WITH SELECT for this patient using SQL from intent routing.
 
         Args:
           question: The patient's wording (for tone in the formatter).
-          sql_query: Exactly the SQL string produced for this turn (validated before execution).
 
-        Never invent SQL — copy it from routed metadata or run context.
+        SQL is closure-bound from orchestration routing metadata; the tool only needs the question.
         """
         logger.info("query_personal_health_data tool patient_id=%s", pid)
-        return _pipeline(pid, name, question.strip(), sql_query)
+        if not routed_sql:
+            logger.error("query_personal_health_data missing routed SQL patient_id=%s", pid)
+            return (
+                f"I'm having trouble looking that up safely right now, {name}. "
+                "Your caregiver can double-check."
+            )
+        return _pipeline(pid, name, question.strip(), routed_sql)
 
     return [query_personal_health_data]
 

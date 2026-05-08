@@ -21,7 +21,7 @@ from langchain_openai import ChatOpenAI
 
 from core.config import config
 from core.language_tags import normalize_primary_language
-from memory.memory_manager import get_recent_turns, load_full_memory, save_interaction
+from memory.memory_manager import get_recent_turns, load_patient_profile, save_interaction
 from orchestration.agent_executor import run_agent as default_run_agent
 from prompts.llm_prompt import LLM_PROMPT
 from routers.intent_router import route_intent
@@ -43,19 +43,6 @@ def _extract_patient_identity(profile: dict[str, Any]) -> tuple[str, str]:
     if diagnosis_stage not in {"mild", "moderate", "severe"}:
         diagnosis_stage = "moderate"
     return first_name, diagnosis_stage
-
-
-# Converts loaded history rows into prompt-friendly conversation lines.
-def _history_rows_to_text(history_rows: list[dict[str, Any]]) -> str:
-    if not history_rows:
-        return "No history yet."
-    lines: list[str] = []
-    for row in history_rows:
-        user_text = row.get("user_text") or ""
-        assistant_text = row.get("assistant_text") or ""
-        lines.append(f"Patient: {user_text}")
-        lines.append(f"Assistant: {assistant_text}")
-    return "\n".join(lines)
 
 
 # LLM-only route: single completion with LLM_PROMPT (no tools / no ReAct).
@@ -93,8 +80,12 @@ async def _run_llm_fallback(
 
 
 # Builds the route-appropriate tool list (DB, RAG, DB_RAG, or empty).
-def _build_tools_for_route(route: str, patient_id: str, patient_name: str) -> list[Any]:
-    db_tools = create_database_tools(patient_id=patient_id, patient_first_name=patient_name)
+def _build_tools_for_route(route: str, patient_id: str, patient_name: str, sql_query: str | None) -> list[Any]:
+    db_tools = create_database_tools(
+        patient_id=patient_id,
+        patient_first_name=patient_name,
+        sql_query=sql_query or "",
+    )
     rag_tools = create_rag_tools()
 
     if route == "DB":
@@ -118,14 +109,10 @@ async def orchestrate_message(
 
     effective_lang = normalize_primary_language(language)
 
-    acknowledge_patient_message(patient_id)
-
     recent_turns = get_recent_turns(patient_id=patient_id, n=3)
-    full_memory = load_full_memory(patient_id=patient_id)
-    profile = full_memory.get("profile", {}) if isinstance(full_memory, dict) else {}
-    history_rows = full_memory.get("history", []) if isinstance(full_memory, dict) else []
+    profile = load_patient_profile(patient_id=patient_id)
     patient_name, diagnosis_stage = _extract_patient_identity(profile if isinstance(profile, dict) else {})
-    conversation_history = _history_rows_to_text(history_rows if isinstance(history_rows, list) else [])
+    conversation_history = recent_turns or "No history yet."
 
     routed = await route_intent(
         message=message,
@@ -154,7 +141,9 @@ async def orchestrate_message(
             patient_id=patient_id,
         )
 
-    if route == "LLM":
+    acknowledge_patient_message(patient_id)
+
+    if route in {"LLM", "CLARIFY"}:
         assistant_text = await _run_llm_fallback(
             message=message,
             patient_name=patient_name,
@@ -163,7 +152,7 @@ async def orchestrate_message(
             language=effective_lang,
         )
     else:
-        tools = _build_tools_for_route(route, patient_id, patient_name)
+        tools = _build_tools_for_route(route, patient_id, patient_name, sql_query)
         runner = run_agent or default_run_agent
 
         assistant_text = await runner(
