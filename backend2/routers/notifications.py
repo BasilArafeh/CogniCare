@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+from schemas.notifications import TestSMSRequest
+from services.twilio_service import send_sms
 
 from schemas.notifications import (
     AgentAlertSessionResponse,
@@ -26,3 +28,10 @@ def escalate_old_alerts():
     return {
         "escalated": escalate_stale_alerts()
     }
+
+@router.post("/test-sms")
+def test_sms(payload: TestSMSRequest):
+    return send_sms(
+        to_number=payload.to_number,
+        body=payload.message,
+    )
