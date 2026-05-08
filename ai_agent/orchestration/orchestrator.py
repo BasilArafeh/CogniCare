@@ -21,7 +21,7 @@ from langchain_openai import ChatOpenAI
 
 from core.config import config
 from core.language_tags import normalize_primary_language
-from memory.memory_manager import get_recent_turns, load_full_memory, save_interaction
+from memory.memory_manager import get_recent_turns, load_patient_profile, save_interaction
 from orchestration.agent_executor import run_agent as default_run_agent
 from prompts.llm_prompt import LLM_PROMPT
 from routers.intent_router import route_intent
@@ -43,19 +43,6 @@ def _extract_patient_identity(profile: dict[str, Any]) -> tuple[str, str]:
     if diagnosis_stage not in {"mild", "moderate", "severe"}:
         diagnosis_stage = "moderate"
     return first_name, diagnosis_stage
-
-
-# Converts loaded history rows into prompt-friendly conversation lines.
-def _history_rows_to_text(history_rows: list[dict[str, Any]]) -> str:
-    if not history_rows:
-        return "No history yet."
-    lines: list[str] = []
-    for row in history_rows:
-        user_text = row.get("user_text") or ""
-        assistant_text = row.get("assistant_text") or ""
-        lines.append(f"Patient: {user_text}")
-        lines.append(f"Assistant: {assistant_text}")
-    return "\n".join(lines)
 
 
 # LLM-only route: single completion with LLM_PROMPT (no tools / no ReAct).
@@ -123,11 +110,9 @@ async def orchestrate_message(
     effective_lang = normalize_primary_language(language)
 
     recent_turns = get_recent_turns(patient_id=patient_id, n=3)
-    full_memory = load_full_memory(patient_id=patient_id)
-    profile = full_memory.get("profile", {}) if isinstance(full_memory, dict) else {}
-    history_rows = full_memory.get("history", []) if isinstance(full_memory, dict) else []
+    profile = load_patient_profile(patient_id=patient_id)
     patient_name, diagnosis_stage = _extract_patient_identity(profile if isinstance(profile, dict) else {})
-    conversation_history = _history_rows_to_text(history_rows if isinstance(history_rows, list) else [])
+    conversation_history = recent_turns or "No history yet."
 
     routed = await route_intent(
         message=message,

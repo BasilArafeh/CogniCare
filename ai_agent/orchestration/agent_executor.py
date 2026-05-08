@@ -47,7 +47,7 @@ def _build_agent_input_message(*, message: str, intent: str, sql: Any) -> str:
     return message
 
 
-# Executes one turn via ReAct tools when available, otherwise direct ChatOpenAI.
+# Executes one turn via tool-calling when tools exist, otherwise direct ChatOpenAI.
 async def run_agent(
     *,
     message: str,
@@ -69,10 +69,7 @@ async def run_agent(
         )
     )
     try:
-        # LangChain 1.x: ReAct helpers live in langchain-classic, not langchain.agents.
-        from langchain_classic.agents import AgentExecutor, create_react_agent
         from langchain_core.messages import HumanMessage, SystemMessage
-        from langchain_core.prompts import PromptTemplate
         from langchain_openai import ChatOpenAI
 
         logger.info(
@@ -82,7 +79,6 @@ async def run_agent(
             config.agent_llm_model,
         )
 
-        llm = ChatOpenAI(model=config.agent_llm_model, temperature=0.4)
         system_prompt = _build_agent_system_prompt(
             intent=intent,
             patient_name=patient_name,
@@ -94,31 +90,63 @@ async def run_agent(
         user_input = _build_agent_input_message(message=message, intent=intent, sql=sql)
 
         if tools:
-            logger.info("run_agent using ReAct executor")
-            react_prompt = PromptTemplate.from_template(
-                "{system_prompt}\n\n"
-                "You can use these tools:\n{tools}\n\n"
-                "Tool names: {tool_names}\n\n"
-                "Question: {input}\n"
-                "Thought: {agent_scratchpad}"
-            ).partial(system_prompt=system_prompt)
+            logger.info("run_agent using tool-calling path")
+            llm = ChatOpenAI(model=config.agent_llm_model, temperature=0.4)
+            llm_with_tools = llm.bind_tools(tools)
 
-            react_agent = create_react_agent(
-                llm=llm,
-                tools=tools,
-                prompt=react_prompt,
+            base_messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_input),
+            ]
+            first_rsp = await llm_with_tools.ainvoke(base_messages)
+
+            tool_calls = getattr(first_rsp, "tool_calls", None) or []
+            if not tool_calls:
+                text = str(getattr(first_rsp, "content", "") or "").strip()
+                return text or safe_fallback
+
+            tool_by_name: dict[str, Any] = {}
+            for tool in tools:
+                name = getattr(tool, "name", None) or getattr(tool, "__name__", None)
+                if isinstance(name, str) and name:
+                    tool_by_name[name] = tool
+
+            tool_results: list[str] = []
+            for tool_call in tool_calls:
+                if not isinstance(tool_call, dict):
+                    continue
+                tool_name = str(tool_call.get("name") or "").strip()
+                if not tool_name:
+                    continue
+                tool = tool_by_name.get(tool_name)
+                if tool is None:
+                    tool_results.append(f"{tool_name}: tool not found")
+                    continue
+
+                args = tool_call.get("args", {})
+                try:
+                    result = tool.invoke(args)
+                except TypeError:
+                    if isinstance(args, dict) and len(args) == 1:
+                        only_arg = next(iter(args.values()))
+                        result = tool.invoke(only_arg)
+                    else:
+                        raise
+                tool_results.append(f"{tool_name}: {result}")
+
+            if not tool_results:
+                text = str(getattr(first_rsp, "content", "") or "").strip()
+                return text or safe_fallback
+
+            tool_result_blob = "\n".join(tool_results)
+            final_rsp = await llm.ainvoke(
+                base_messages + [HumanMessage(content=f"Tool result: {tool_result_blob}")]
             )
-            executor = AgentExecutor(
-                agent=react_agent,
-                tools=tools,
-                max_iterations=3,
-                handle_parsing_errors=True,
-            )
-            result = await executor.ainvoke({"input": user_input})
-            text = str(result.get("output") or "").strip()
+            text = str(getattr(final_rsp, "content", "") or "").strip()
             return text or safe_fallback
 
         logger.info("run_agent using direct ChatOpenAI path")
+        llm = ChatOpenAI(model=config.agent_llm_model, temperature=0.4)
         rsp = await llm.ainvoke(
             [
                 SystemMessage(content=system_prompt),

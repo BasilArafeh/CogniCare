@@ -83,6 +83,7 @@ def _pipeline(
 ) -> str:
     """Validate → execute SELECT → summarize; never leaks internals."""
     sql_query = sql_query.strip()
+    logger.info("Executing SQL: %s", sql_query)
     ok, err = validate_sql(sql_query, patient_id)
     if not ok:
         logger.error("SQL rejected before run: %s", err)

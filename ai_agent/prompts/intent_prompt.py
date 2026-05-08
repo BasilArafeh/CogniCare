@@ -141,6 +141,11 @@ For every patient-specific query include a predicate like:
 Use single SELECT statements only. Do not reference interaction_log,
  or long_term_memory.
 
+- meal_time, medication_time, start_time, end_time are TIME columns (time without time zone).
+  Never wrap them with DATE(). To filter by time use direct comparison like:
+  WHERE patient_meals.meal_time >= '08:00' AND patient_meals.meal_time <= '12:00'
+  or just SELECT them directly without any date/time casting functions.
+
 --------------------------------------------------
 patients
 --------------------------------------------------
@@ -192,7 +197,6 @@ medication_id, medication_name, medication_description
 meals
 --------------------------------------------------
 meal_id, meal_type
-
 
 --------------------------------------------------
 activity
