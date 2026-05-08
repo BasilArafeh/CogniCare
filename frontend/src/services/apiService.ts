@@ -513,7 +513,7 @@ class ApiService {
       // last_name and diagnosis_stage are NOT NULL in schema — send '' if empty
       const primaryEmergency = payload.emergency_contacts[0];
       const emergencyContactText = primaryEmergency
-        ? `${primaryEmergency.name} - ${primaryEmergency.phone}`
+        ? (primaryEmergency.phone as string) || null
         : null;
 
       console.log('[API] postSetup: inserting patient row');

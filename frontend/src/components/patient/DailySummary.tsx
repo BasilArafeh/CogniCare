@@ -41,12 +41,14 @@ export default function DailySummary({ patientId }: Props) {
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      console.log('[DailySummary] loading for patientId =', patientId);
       setLoading(true);
       const [meds, meals, activities] = await Promise.all([
         apiService.getPatientMedications(patientId),
         apiService.getPatientMeals(patientId),
         apiService.getPatientActivities(patientId),
       ]);
+      console.log('[DailySummary] loaded | meds =', meds.length, '| meals =', meals.length, '| activities =', activities.length);
 
       if (cancelled) return;
 
