@@ -1,31 +1,43 @@
 """
-agent/memory/memory_manager.py
---------------------------------
-Handles all memory operations for the agent layer.
-Reads and writes to Supabase for long-term memory.
-LangChain InMemorySaver handles short-term memory automatically.
+Supabase-backed long-term memory: recent turns, session history + profile, and interaction logging.
 
-Functions:
-  - get_recent_turns()  → used by intent router before classification
-  - load_full_memory()  → used by agent at session start
-  - save_interaction()  → called after every turn
+In-session buffering is handled by LangChain separately.
 """
 
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
-from agent.core.connections import supabase_client
+from core.connections import supabase_client
 
 logger = logging.getLogger(__name__)
 
 
-# Fetches last n turns for a patient as a plain string.
-# Called by intent_router.py to give the router recent context.
-def get_recent_turns(patient_id: int, n: int = 3) -> str:
+# Fetches the last n chat turns as a single string so the intent router has recent context.
+def get_recent_turns(patient_id: str, n: int = 3) -> str:
+    """
+    Fetches last n turns for a patient as a plain string.
+    Called by intent_router.py to provide the router with recent context.
+
+    Args:
+        patient_id: UUID string of the active patient.
+        n: Number of recent turns to retrieve. Default is 3.
+
+    Returns:
+        Plain string of turns formatted as:
+            Patient (timestamp): <message>
+            Agent (timestamp): <response>
+        Returns empty string if no history exists or on error.
+    """
+    if supabase_client is None:
+        logger.warning(
+            "get_recent_turns skipped: Supabase is not configured (patient_id=%s).",
+            patient_id,
+        )
+        return ""
     try:
         response = (
-            supabase_client
-            .table("interaction_log")
+            supabase_client.table("interaction_log")
             .select("user_text, assistant_text, interaction_timestamp")
             .eq("patient_id", patient_id)
             .order("interaction_timestamp", desc=True)
@@ -35,30 +47,58 @@ def get_recent_turns(patient_id: int, n: int = 3) -> str:
 
         rows = response.data
         if not rows:
+            logger.debug(
+                "get_recent_turns: no rows for patient_id=%s n=%s",
+                patient_id,
+                n,
+            )
             return ""
 
-        # Reverse so oldest turn comes first
+        # Reverse so oldest turn comes first (correct order for LLM context)
         rows = list(reversed(rows))
 
         turns = []
         for row in rows:
-            turns.append(f"Patient: {row['user_text']}")
-            turns.append(f"Agent: {row['assistant_text']}")
+            ts = row.get("interaction_timestamp", "")
+            user_text = row.get("user_text") or ""
+            assistant_text = row.get("assistant_text") or ""
+            turns.append(f"Patient ({ts}): {user_text}")
+            turns.append(f"Agent ({ts}): {assistant_text}")
 
+        logger.debug(
+            "get_recent_turns: retrieved %s turn(s) for patient_id=%s",
+            len(rows),
+            patient_id,
+        )
         return "\n".join(turns)
 
-    except Exception as e:
-        logger.error(f"Failed to fetch recent turns for patient {patient_id}: {e}")
+    except Exception:
+        logger.exception("Failed to fetch recent turns for patient_id=%s", patient_id)
         return ""
 
 
-# Fetches full conversation history + patient memory profile.
-# Called by orchestrator.py when building the agent's context at session start.
-def load_full_memory(patient_id: int) -> dict:
+# Loads capped interaction history and the patient_memory row used when assembling agent context at session start.
+def load_full_memory(patient_id: str) -> dict[str, Any]:
+    """
+    Fetches full conversation history + patient memory profile.
+    Called by orchestrator.py when building the agent's context at session start.
+
+    Returns:
+        dict with keys:
+            "history": list of dicts (oldest to newest), max 20 turns
+            "profile": dict for patient_memory row, or {}
+
+    The orchestrator should format "history" into a plain string before {conversation_history}.
+    """
+    if supabase_client is None:
+        logger.warning(
+            "load_full_memory skipped: Supabase is not configured (patient_id=%s).",
+            patient_id,
+        )
+        return {"history": [], "profile": {}}
     try:
         history_response = (
-            supabase_client
-            .table("interaction_log")
+            supabase_client.table("interaction_log")
             .select("user_text, assistant_text, interaction_timestamp")
             .eq("patient_id", patient_id)
             .order("interaction_timestamp", desc=True)
@@ -67,42 +107,75 @@ def load_full_memory(patient_id: int) -> dict:
         )
 
         memory_response = (
-            supabase_client
-            .table("patient_memory")
+            supabase_client.table("patient_memory")
             .select("*")
             .eq("patient_id", patient_id)
-            .maybe_single()          # returns None instead of raising if no row exists
+            .maybe_single()
             .execute()
         )
 
-        return {
-            "history": list(reversed(history_response.data or [])),
-            "profile": memory_response.data or {}
-        }
+        history = list(reversed(history_response.data or []))
+        raw_profile = memory_response.data
+        if raw_profile is None:
+            profile: dict[str, Any] = {}
+        elif isinstance(raw_profile, list):
+            profile = raw_profile[0] if raw_profile else {}
+        else:
+            profile = raw_profile
+        logger.info(
+            "load_full_memory: patient_id=%s history_turns=%s profile_present=%s",
+            patient_id,
+            len(history),
+            bool(profile),
+        )
+        return {"history": history, "profile": profile}
 
-    except Exception as e:
-        logger.error(f"Failed to load full memory for patient {patient_id}: {e}")
+    except Exception:
+        logger.exception("Failed to load full memory for patient_id=%s", patient_id)
         return {"history": [], "profile": {}}
 
 
-# Saves a completed turn to interaction_log after every agent response.
-# Called by orchestrator.py after the agent returns its response.
+# Writes one completed user message + assistant reply to interaction_log after a turn finishes.
 def save_interaction(
-    patient_id: int,
+    patient_id: str,
     user_text: str,
     assistant_text: str,
     detected_intent: str,
-    confusion_flag: bool = False
+    confusion_flag: bool = False,
 ) -> None:
-    try:
-        supabase_client.table("interaction_log").insert({
-            "patient_id": patient_id,
-            "user_text": user_text,
-            "assistant_text": assistant_text,
-            "detected_intent": detected_intent,
-            "confusion_flag": confusion_flag,
-            "interaction_timestamp": datetime.now(timezone.utc).isoformat()
-        }).execute()
+    """
+    Saves a completed turn to interaction_log after every agent response.
 
-    except Exception as e:
-        logger.error(f"Failed to save interaction for patient {patient_id}: {e}")
+    confusion_flag is forced True when detected_intent is CLARIFY.
+    """
+    if detected_intent == "CLARIFY":
+        confusion_flag = True
+
+    if supabase_client is None:
+        logger.warning(
+            "save_interaction skipped: Supabase is not configured (patient_id=%s).",
+            patient_id,
+        )
+        return
+
+    try:
+        supabase_client.table("interaction_log").insert(
+            {
+                "patient_id": patient_id,
+                "user_text": user_text,
+                "assistant_text": assistant_text,
+                "detected_intent": detected_intent,
+                "confusion_flag": confusion_flag,
+                "interaction_timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        ).execute()
+
+        logger.info(
+            "Interaction saved: patient_id=%s intent=%s confusion=%s",
+            patient_id,
+            detected_intent,
+            confusion_flag,
+        )
+
+    except Exception:
+        logger.exception("Failed to save interaction for patient_id=%s", patient_id)

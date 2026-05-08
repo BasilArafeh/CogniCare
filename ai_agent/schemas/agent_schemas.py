@@ -1,30 +1,49 @@
-"""
-agent/schemas/agent_schemas.py
---------------------------------
-Pydantic models for FastAPI request and response validation.
-Used exclusively by api/main.py.
+"""Simple request/response schemas for the agent."""
 
-Models:
-  - MessageRequest  → validates incoming patient messages (POST /agent/message)
-  - AgentResponse   → structures the response sent back to the frontend
-"""
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class MessageRequest(BaseModel):
-    """
-    Incoming request from the frontend when a patient sends a message.
-    """
-    patient_id: int = Field(..., gt=0, description="The active patient's ID.")
-    session_id: str = Field(..., min_length=1, description="Unique session identifier for this conversation sitting.")
-    message: str = Field(..., min_length=1, max_length=1000, description="The patient's message text.")
+IntentRoute = Literal["DB", "RAG", "DB_RAG", "LLM", "CLARIFY", "EMERGENCY"]
+
+
+class VoiceMessageRequest(BaseModel):
+    """Voice request after STT."""
+
+    patient_id: str | int
+    message: str = Field(min_length=1, max_length=1000)
+    language: str = Field(default="en")
+
+
+class ChatMessageRequest(BaseModel):
+    """Chat request from the app."""
+
+    patient_id: str | int
+    message: str = Field(min_length=1, max_length=1000)
+    language: str = Field(default="en")
+
+
+class ReminderReplyRequest(BaseModel):
+    """Patient tap or reply after a scheduled reminder."""
+
+    patient_id: str = Field(min_length=1)
+    reminder_type: str = Field(min_length=1)
+    item_label: str = Field(min_length=1)
+    confirmed: bool
 
 
 class AgentResponse(BaseModel):
-    """
-    Response sent back to the frontend after every agent turn.
-    """
-    response: str = Field(..., description="The agent's reply in patient-friendly language.")
-    intent: str = Field(..., description="The detected route — DB, RAG, DB_RAG, LLM, CLARIFY, or EMERGENCY.")
-    session_id: str = Field(..., description="Echoed back so the frontend can continue the session.")
+    """Final reply to the caller."""
+
+    response: str = Field(min_length=1)
+    patient_id: str = Field(min_length=1)
+
+
+__all__ = [
+    "AgentResponse",
+    "ChatMessageRequest",
+    "IntentRoute",
+    "ReminderReplyRequest",
+    "VoiceMessageRequest",
+]

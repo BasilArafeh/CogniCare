@@ -1,0 +1,102 @@
+[
+    {
+      "question": "What are the early signs of Alzheimer's disease?",
+      "ground_truth": "One of the most common early signs of Alzheimer's is forgetting recently learned information, forgetting important dates or events, and asking the same questions repeatedly. People may increasingly rely on memory aids or family members for things they used to handle on their own. In the early stage a person may still function independently but begin to have trouble coming up with the right word or name, forgetting material just read, losing or misplacing a valuable object, and having increasing trouble with planning or organizing.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's feel confused when they wake up at night?",
+      "ground_truth": "People with Alzheimer's feel confused at night due to an upset in the internal body clock causing a biological mix-up between day and night. Reduced lighting and increased shadows cause them to misinterpret what they see and become confused and afraid. Disorientation from the inability to separate dreams from reality when sleeping also contributes. Keeping the home well lit in the evening, maintaining a regular routine of meals and sleep, and avoiding stimulants like caffeine and alcohol can help.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's get angry or aggressive?",
+      "ground_truth": "Alzheimer's causes changes in the brain that may make the person act in new and unusual ways. Aggressive behaviors are actually a form of communication like an alarm signaling an unmet need. Triggers can be physical such as pain or discomfort, social such as being around people who stress the person, environmental such as a room being too hot or noisy, or personal such as feeling scared about a change in daily routine. Understanding that these behaviors are not something the person can control can help caregivers respond with patience.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Is depression common in people with Alzheimer's disease?",
+      "ground_truth": "Depression is very common among people with Alzheimer's especially during the early and middle stages. Experts estimate that up to 40 percent of people with Alzheimer's disease suffer from significant depression. Treatment is available and can make a significant difference in quality of life. Common feelings after a diagnosis include anger, fear, isolation, and a sense of loss. The most common treatment involves a combination of medicine, counseling, and gradual reconnection to activities and people that bring happiness.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's keep losing and misplacing things?",
+      "ground_truth": "People living with Alzheimer's may put things in unusual places and lose things being unable to go back over their steps to find them again. They may accuse others of stealing especially as the disease progresses. This is different from the normal age-related change of misplacing things from time to time and retracing steps to find them. Organizing the home by placing regularly used items in clear sight and using labels can help reduce frustration.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's stop recognizing family members they have known for years?",
+      "ground_truth": "Alzheimer's is a degenerative brain disease caused by complex brain changes following cell damage leading to dementia symptoms that gradually worsen over time. As the disease advances symptoms get more severe and include disorientation and confusion. In the later stages a person may not recognize someone they have known for years and view them as a stranger or intruder. Memory and cognitive skills continue to decline and individuals lose the ability to respond to their environment.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "What causes increased confusion in the evenings for people with Alzheimer's?",
+      "ground_truth": "Increased confusion in the evenings is related to an upset in the internal body clock causing a biological mix-up between day and night. Reduced lighting and increased shadows cause people with Alzheimer's to misinterpret what they see and become confused and afraid. End-of-day exhaustion both mental and physical also contributes. Keeping the home well lit in the evening, maintaining a regular routine, discouraging afternoon napping, and avoiding stimulants like caffeine and alcohol can help reduce evening confusion.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's forget where they are even when they are at home?",
+      "ground_truth": "People living with Alzheimer's can lose track of dates, seasons and the passage of time. Sometimes they may forget where they are or how they got there. In the middle stage symptoms may include confusion about where they are or what day it is and being unable to recall their own address or telephone number. Getting confused about the day of the week but figuring it out later is a typical age-related change whereas persistent disorientation about place is a warning sign of Alzheimer's.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "What are hallucinations in Alzheimer's disease and what causes them?",
+      "ground_truth": "Hallucinations are false perceptions of objects or events involving the senses. When a person with Alzheimer's hallucinates they may see, hear, smell, taste or feel something that is not there. Some hallucinations may be frightening while others may involve ordinary visions of people, situations or objects from the past. These false perceptions are caused by changes within the brain that result from Alzheimer's usually in the later stages. If a person with Alzheimer's begins hallucinating it is important to see a doctor to rule out other possible causes.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's have trouble finding the right words when talking?",
+      "ground_truth": "People living with Alzheimer's may have trouble following or joining a conversation. They may stop in the middle of a conversation and have no idea how to continue or repeat themselves. They may struggle with vocabulary, have trouble naming a familiar object or use the wrong name. Problems you can expect to see throughout the progression of the disease include difficulty finding the right words, using familiar words repeatedly, describing familiar objects rather than calling them by name, easily losing a train of thought, and difficulty organizing words logically.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's forget how to do familiar tasks they have done their whole life?",
+      "ground_truth": "People living with Alzheimer's disease often find it hard to complete routine tasks. Sometimes they may have trouble driving to a familiar location, organizing a grocery list or remembering the rules of a favorite game. In the middle stage damage to nerve cells in the brain makes it difficult for the person to express thoughts and perform routine tasks without assistance. Some people may also have trouble following a familiar recipe or keeping track of monthly bills.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's resist bathing and personal care?",
+      "ground_truth": "Bathing is often the most difficult personal care activity that caregivers face. Because it is such an intimate experience people with Alzheimer's and other dementias may perceive it as unpleasant or intrusive. In the middle stage a person may refuse to bathe. Many people will experience incontinence in the later stages of Alzheimer's and other dementias which adds to discomfort and reluctance to participate in personal care routines. How caregivers respond can help the person with dementia retain a sense of dignity.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's wander and try to go to places they no longer need to go?",
+      "ground_truth": "It is common for a person living with dementia to wander or become lost or confused about their location even in the mild or early stage. Six in 10 people living with dementia will wander at least once and many do so repeatedly. Reasons for wandering include physical pain or restlessness, an unmet need like hunger, or boredom. If the person wants to leave to go home or go to work caregivers should use communication focused on exploration and validation rather than correcting the person.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Do Alzheimer's medications stop the progression of the disease?",
+      "ground_truth": "While cholinesterase inhibitors and memantine may temporarily help symptoms they do not slow or stop brain changes that cause Alzheimer's to become more severe over time. The newer anti-amyloid medications donanemab and lecanemab are approved only for people diagnosed in the early stages and work by removing beta-amyloid to reduce cognitive and functional decline thereby slowing the typical progression of the disease. Some medications are only effective in the early stages of the disease so it is important to seek a diagnosis as early as possible.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's sometimes not recognize their own reflection in the mirror?",
+      "ground_truth": "As Alzheimer's progresses into the middle and late stages major personality changes can occur and a person may lose awareness of recent experiences as well as their surroundings. In the late stage individuals lose the ability to respond to their environment. A person with Alzheimer's may become suspicious of those around them even accusing others of theft or improper behavior. Covering mirrors with a cloth or removing them if the person thinks they are looking at a stranger can help reduce distress.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "What happens to swallowing ability in the late stage of Alzheimer's?",
+      "ground_truth": "In the late stage of Alzheimer's disease symptoms are severe and will interfere with most daily activities. Changes in physical abilities will worsen affecting the ability to walk, sit and eventually swallow. People in the late stage lose the ability to carry on a conversation and respond to the environment. Around-the-clock care is usually required. People may be at higher risk of infections especially pneumonia. If there are swallowing issues visiting a speech therapist for appropriate strategies is recommended.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's feel disoriented and think they are somewhere else?",
+      "ground_truth": "People living with Alzheimer's can lose track of dates, seasons and the passage of time and sometimes forget where they are or how they got there. Anyone who has memory problems is at risk for wandering and becoming disoriented even in familiar places. A person may try to go home even when they are already home. Changes in environment such as travel or hospitalization can worsen disorientation. Creating a dementia-friendly home with improved lighting and displayed personal items can help reduce stress and anxiety.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "What physical symptoms occur in the late stage of Alzheimer's disease?",
+      "ground_truth": "In the late stage of Alzheimer's disease people experience changes in physical abilities including the ability to walk, sit and eventually swallow. People lose the ability to carry on a conversation or respond to their environment and eventually lose control of movement. Assistance or supervision is required to complete most daily personal care. People may be at higher risk of infections especially pneumonia. Around-the-clock care is usually required in this stage.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "Why do people with Alzheimer's have good days and bad days with their memory?",
+      "ground_truth": "People with Alzheimer's will experience good days and bad days. On bad days they may struggle to find the right words, lose their train of thought, repeat words stories or questions, get words confused or say them in the incorrect order, and have problems understanding what other people are saying. Most changes in the brain that cause dementia are permanent and worsen over time. However thinking and memory problems caused by conditions like depression, medication side effects, excess use of alcohol, thyroid problems, or vitamin deficiencies may improve when the condition is treated.",
+      "retrieval_target": "medical"
+    },
+    {
+      "question": "How should a person with Alzheimer's share their diagnosis with family and friends?",
+      "ground_truth": "Some relationships may be tested when a person reveals their Alzheimer's diagnosis but others may be strengthened. Negative reactions based on stigma or misconceptions may reflect a person's need for more time or education before they can respond in helpful ways. People are advised to remind others that they are still the same person and that what has made them close continues unchanged. Talking openly with those you trust is a powerful way to engage their support and educate them about the disease.",
+      "retrieval_target": "medical"
+    }
+  ]

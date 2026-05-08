@@ -1,0 +1,119 @@
+---
+alwaysApply: true
+---
+# CogniCare — Cursor Rules
+
+## What This Is
+AI caregiver assistant for Alzheimer's patients.
+Uses personal health data, long-term memory, and a medical knowledge base.
+
+---
+
+## Project Structure
+cognicare/
+│
+├── api/
+│   └── main.py                         # FastAPI — POST /agent/message
+│
+├── core/
+│   ├── connections.py                  # Supabase + OpenAI client singletons
+│   └── config.py                       # Env vars + constants
+│
+├── schemas/
+│   └── agent_schemas.py                # MessageRequest + AgentResponse
+│
+├── orchestration/
+│   └── orchestrator.py                 # Memory, emergency bypass, save interaction
+│
+├── intent/
+│   ├── intent_router.py                # Classifies → DB/RAG/DB_RAG/LLM/CLARIFY/EMERGENCY
+│   └── intent_prompt.py                # Intent classification prompt
+│
+├── agent/
+│   ├── executor.py                     # LangChain ReAct agent setup + invoke
+│   └── prompts/
+│       ├── agent_prompt.py             # Agent system prompt
+│       ├── db_prompt.py                # DB result formatter prompt
+│       ├── rag_prompt.py               # RAG result formatter prompt
+│       └── llm_prompt.py              # General LLM fallback prompt
+│
+├── memory/
+│   └── memory_manager.py              # load_full_memory, get_recent_turns, save_interaction, update_patient_memory
+│
+├── tools/
+│   ├── db_tools.py                     # get_medications, get_appointments, get_reminders, get_caregiver_contact
+│   ├── rag_tool.py                     # search_knowledge_base
+│   ├── confusion_tool.py               # log_confusion
+│   ├── sql_validator.py                # validate_sql — internal only
+│   └── emergency_tool.py              # escalate_to_caregiver — orchestrator only
+│
+└── scheduler/
+    ├── scheduler.py                  # APScheduler start + hourly DB reload → register jobs
+    ├── reminder_delivery.py          # Patient webhook/log + 5m window → CAREGIVER_ALERT_SMS
+    ├── queries/                      # Supabase selects only (patient_medications / meals / activities)
+    ├── medication_reminder.py        # Cron registration + fire handler
+    ├── meal_reminder.py
+    └── activity_reminder.py
+
+-You may see some built files already review them and apply changes if needed.
+-Add a simple comment above each function explaning what its for
+-Make clear loggins for everything to trace if any errors provided
+---
+
+## Request Flow
+
+POST /agent/message
+        ↓
+orchestrator.py
+  1. load_full_memory()       → last 20 interactions + patient profile
+  2. get_recent_turns(n=3)    → for intent router only
+  3. route_intent()           → classify message
+  4. EMERGENCY? → escalate_to_caregiver() → return immediately
+  5. agent.invoke()           → agent picks tools and responds
+  6. save_interaction()       → log to Supabase
+  7. return AgentResponse
+
+---
+
+## Use Cases
+
+| Route     | Example                        | What Happens                          |
+|-----------|--------------------------------|---------------------------------------|
+| DB        | "What are my medications?"     | Agent calls DB tools                  |
+| RAG       | "What is Alzheimer's?"         | Agent calls search_knowledge_base     |
+| DB_RAG    | "Is my medication safe?"       | Agent calls DB + RAG, merges answer   |
+| LLM       | "I feel lonely"                | Agent responds, no tools              |
+| CLARIFY   | Unclear message                | Agent gently asks patient to repeat   |
+| EMERGENCY | "I fell" / "I'm in pain"       | Orchestrator bypasses agent, alerts caregiver |
+
+---
+
+## Memory Rules
+- Short-term → LangChain ConversationBufferMemory, RAM only, per session
+- Interaction log → Supabase, saved after every turn
+- Patient profile → Supabase, updated at session end using last 3 turns only
+- Agent gets last 20 interactions at session start
+- Intent router gets last 3 turns only
+
+---
+
+## Tool Rules
+- LangChain tools (agent picks): db_tools, rag_tool, confusion_tool
+- Internal only (not agent-facing): sql_validator, escalate_to_caregiver
+- SQL is always validated before execution
+- No tool called more than once per turn for the same data
+- Tool failures → graceful response, never expose errors to patient
+
+---
+
+## Hard Rules
+- EMERGENCY is always handled by orchestrator — agent never sees it
+- RAG is external — send query, receive chunks only
+- Never fabricate patient data — always fetch from DB
+- Never expose tool names, SQL, or system internals to the patient
+- Never advise medication changes or give medical advice beyond the knowledge base
+
+---
+
+## Stack
+FastAPI, langchain framwork for the agent, LangChain ReAct , Db Supabase(postgresql), GPT-4o for the intent classification,APScheduler for reminders , Pydantic
