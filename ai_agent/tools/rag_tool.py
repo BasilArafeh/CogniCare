@@ -136,6 +136,7 @@ def _retrieve(question: str) -> str:
         return FALLBACK_TEXT
 
     contents = _rpc_match_contents(embedding, match_count=3)
+    logger.info("RAG chunks retrieved: %s", len(contents))
     if not contents:
         return FALLBACK_TEXT
 
