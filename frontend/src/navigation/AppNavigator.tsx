@@ -7,6 +7,8 @@ import CaregiverSignInScreen from '../screens/CaregiverSignInScreen';
 import PatientLoginScreen from '../screens/PatientLoginScreen';
 import PatientHomeScreen from '../screens/PatientHomeScreen';
 import CaregiverDashboardScreen from '../screens/CaregiverDashboardScreen';
+import ReportViewerScreen from '../screens/ReportViewerScreen';
+import PdfViewerScreen from '../screens/PdfViewerScreen';
 
 export type RootStackParamList = {
   Loading: undefined;
@@ -20,6 +22,16 @@ export type RootStackParamList = {
     caregiverId: number;
     caregiverName: string;
     patientName: string;
+  };
+  ReportViewer: {
+    title: string;
+    period: string;
+    reportDate: string;
+    pdfUrl: string;
+  };
+  PdfViewer: {
+    title: string;
+    pdfUrl: string;
   };
 };
 
@@ -38,6 +50,8 @@ export default function AppNavigator() {
       <Stack.Screen name="PatientLogin" component={PatientLoginScreen} />
       <Stack.Screen name="PatientHome" component={PatientHomeScreen} />
       <Stack.Screen name="CaregiverDashboard" component={CaregiverDashboardScreen} />
+      <Stack.Screen name="ReportViewer" component={ReportViewerScreen} />
+      <Stack.Screen name="PdfViewer" component={PdfViewerScreen} />
     </Stack.Navigator>
   );
 }
