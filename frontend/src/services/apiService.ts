@@ -1,12 +1,43 @@
 import axios, { AxiosInstance } from 'axios';
 import * as FileSystem from 'expo-file-system/legacy';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { supabase } from './supabaseClient';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-// Python backend URL — set EXPO_PUBLIC_RAG_URL in frontend/.env
-const RAG_BASE_URL = process.env.EXPO_PUBLIC_RAG_URL ?? 'http://localhost:8000';
+function resolveAiAgentBaseUrl(): string {
+  // Explicit env var wins (supports both old and clearer naming).
+  const configured =
+    process.env.EXPO_PUBLIC_AI_AGENT_URL?.trim() ||
+    process.env.EXPO_PUBLIC_RAG_URL?.trim();
+  if (configured) return configured;
+
+  // Expo host info can be present in multiple places depending on SDK/runtime.
+  const constantsAny = Constants as unknown as {
+    expoConfig?: { hostUri?: string };
+    manifest?: { debuggerHost?: string };
+    manifest2?: { extra?: { expoGo?: { debuggerHost?: string } } };
+  };
+  const hostUri =
+    constantsAny.expoConfig?.hostUri ??
+    constantsAny.manifest2?.extra?.expoGo?.debuggerHost ??
+    constantsAny.manifest?.debuggerHost ??
+    null;
+  // Example hostUri/debuggerHost: "192.168.1.14:8081" -> "http://192.168.1.14:8000"
+  const host = hostUri?.split(':')[0] ?? null;
+  if (host) return `http://${host}:8000`;
+
+  // Android emulator needs the special loopback alias.
+  if (Platform.OS === 'android') return 'http://10.0.2.2:8000';
+
+  // iOS simulator on same machine can still use localhost.
+  return 'http://localhost:8000';
+}
+
+const RAG_BASE_URL = resolveAiAgentBaseUrl();
+console.log('[API] AI agent base URL =', RAG_BASE_URL);
 
 export class ApiException extends Error {
   constructor(
