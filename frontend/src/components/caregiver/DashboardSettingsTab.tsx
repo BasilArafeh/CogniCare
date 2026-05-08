@@ -685,9 +685,14 @@ export default function DashboardSettingsTab({ patientId }: Props) {
               key={`edit-fam-${famKey}`}
               initial={f}
               onSave={async (fn, ln, r, c) => {
-                await apiService.editFamilyMember(f.familyMemberId, fn, ln, r, c);
-                setEditingFamilyId(null);
-                await fetchAll();
+                try {
+                  await apiService.editFamilyMember(f.familyMemberId, fn, ln, r, c);
+                  setEditingFamilyId(null);
+                  await fetchAll();
+                } catch (err) {
+                  console.error('[Settings] editFamilyMember failed:', err);
+                  Alert.alert('Error', 'Failed to update family member.');
+                }
               }}
               onCancel={() => setEditingFamilyId(null)}
             />
