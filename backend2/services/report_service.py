@@ -993,6 +993,49 @@ def _build_repeated_questions_section(repeated_questions: list, styles: dict) ->
 # Main PDF builder — public API (called by routers/reports.py)
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _save_report_to_db(patient_id: int, patient_name: str, file_name: str, days: int) -> None:
+    """Insert a row into the report table after PDF generation. Non-fatal on error."""
+    try:
+        client = get_supabase_client()
+        cg = (
+            client.table("caregiver")
+            .select("caregiver_id")
+            .eq("patient_id", patient_id)
+            .eq("role", "Primary Caregiver")
+            .limit(1)
+            .execute()
+        )
+        if not cg.data:
+            cg = (
+                client.table("caregiver")
+                .select("caregiver_id")
+                .eq("patient_id", patient_id)
+                .limit(1)
+                .execute()
+            )
+        if not cg.data:
+            return
+        caregiver_id = cg.data[0]["caregiver_id"]
+        today = datetime.now()
+        date_from = today - timedelta(days=days)
+        period = (
+            f"{date_from.strftime('%B')} {date_from.day}, {date_from.year}"
+            f" – {today.strftime('%B')} {today.day}, {today.year}"
+        )
+        description = json.dumps({
+            "title": f"{days}-day health report for {patient_name}",
+            "period": period,
+            "file_name": file_name,
+        })
+        client.table("report").insert({
+            "caregiver_id": caregiver_id,
+            "report_date": today.date().isoformat(),
+            "description": description,
+        }).execute()
+    except Exception:
+        pass
+
+
 def build_patient_report_pdf(patient_id: int, days: int = REPORT_WINDOW_DAYS) -> str:
     global _PW
     _ensure_reportlab_installed()
@@ -1090,27 +1133,19 @@ def build_patient_report_pdf(patient_id: int, days: int = REPORT_WINDOW_DAYS) ->
         subtitle="Activities scheduled during this period with confirmation status.",
     )
 
-    story.append(PageBreak())
-
-    # 10 — Conversation highlights (dialogue cards)
-    story += _build_conversation_highlights_section(interactions, styles)
-
-    # 11 — Repeated questions (only when patterns exist)
+    # Repeated questions (only when patterns exist)
     if repeated_questions:
-        story.append(Spacer(1, 0.3 * cm))
+        story.append(PageBreak())
         story += _build_repeated_questions_section(repeated_questions, styles)
 
     doc.build(story, onFirstPage=_add_footer, onLaterPages=_add_footer)
+    _save_report_to_db(patient_id, patient_name, file_name, days)
     return file_path
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Metadata / file helpers — called by routers/reports.py
+# File helpers — called by routers/reports.py
 # ──────────────────────────────────────────────────────────────────────────────
-
-def build_report_metadata(file_path: str) -> dict:
-    return {"file_name": os.path.basename(file_path), "file_type": "application/pdf"}
-
 
 def get_report_file_path(file_name: str) -> str:
     safe_name = os.path.basename(file_name)
@@ -1118,3 +1153,34 @@ def get_report_file_path(file_name: str) -> str:
     if not os.path.exists(file_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report file not found")
     return file_path
+
+
+def get_latest_patient_report_file_path(patient_id: int) -> str:
+    client = get_supabase_client()
+    cg = (
+        client.table("caregiver")
+        .select("caregiver_id")
+        .eq("patient_id", patient_id)
+        .limit(1)
+        .execute()
+    )
+    if not cg.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No caregiver found for patient")
+    caregiver_id = cg.data[0]["caregiver_id"]
+    result = (
+        client.table("report")
+        .select("description")
+        .eq("caregiver_id", caregiver_id)
+        .order("report_date", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No reports found for patient")
+    desc = result.data[0]["description"]
+    if isinstance(desc, str):
+        desc = json.loads(desc)
+    file_name = desc.get("file_name")
+    if not file_name:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report file name not found in description")
+    return get_report_file_path(file_name)

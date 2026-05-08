@@ -259,21 +259,20 @@ export interface EmergencyContactDisplay {
   priorityLevel: number;
 }
 
-interface WeeklyReportRow {
+interface ReportRow {
   report_id: number;
-  patient_id: number;
-  week_start: string;
-  week_end: string;
-  pdf_url: string | null;
-  created_at: string;
+  caregiver_id: number;
+  report_date: string;
+  description: string | Record<string, unknown> | null;
 }
 
 export interface WeeklyReportDisplay {
   reportId: number;
-  weekStart: string;
-  weekEnd: string;
-  pdfUrl: string | null;
-  createdAt: string;
+  caregiverId: number;
+  reportDate: string;
+  title: string;
+  period: string;
+  pdfUrl: string;
 }
 
 
@@ -927,19 +926,39 @@ class ApiService {
 
   // ─── Weekly Reports ───────────────────────────────────────────────────────
 
-  async getWeeklyReports(patientId: number): Promise<WeeklyReportDisplay[]> {
+  async getWeeklyReports(caregiverId: number, patientId: number): Promise<WeeklyReportDisplay[]> {
     try {
-      const { data } = await this.db.get<WeeklyReportRow[]>(
-        `/weekly_report?patient_id=eq.${patientId}&order=created_at.desc`,
+      const { data } = await this.db.get<ReportRow[]>(
+        `/report?caregiver_id=eq.${caregiverId}&select=*&order=report_date.desc`,
       );
-      return data.map((r) => ({
-        reportId: r.report_id,
-        weekStart: r.week_start,
-        weekEnd: r.week_end,
-        pdfUrl: r.pdf_url ?? null,
-        createdAt: r.created_at,
-      }));
-    } catch { return []; }
+      console.log('[API] getWeeklyReports: raw rows =', JSON.stringify(data));
+      return data.map((r) => {
+        let title = 'Health Report';
+        let period = '';
+        try {
+          const raw = r.description ?? '{}';
+          const parsed: Record<string, unknown> =
+            typeof raw === 'string' ? JSON.parse(raw) : (raw as Record<string, unknown>);
+          title = (parsed.title as string) ?? title;
+          period = (parsed.period as string) ?? '';
+        } catch { /* use defaults */ }
+        return {
+          reportId: r.report_id,
+          caregiverId: r.caregiver_id,
+          reportDate: r.report_date,
+          title,
+          period,
+          pdfUrl: `${RAG_BASE_URL}/reports/patient/${patientId}/pdf`,
+        };
+      });
+    } catch (err) {
+      console.error('[API] getWeeklyReports failed:', err);
+      return [];
+    }
+  }
+
+  getPdfUrl(patientId: number): string {
+    return `${RAG_BASE_URL}/reports/patient/${patientId}/pdf`;
   }
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
