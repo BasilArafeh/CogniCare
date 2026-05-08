@@ -32,7 +32,6 @@ ALLOWED_TABLES = {
     "family_member",
     "reminders",
     "alerts",
-    "report",
 }
 
 RE_FROM_TABLE = re.compile(
@@ -84,8 +83,8 @@ def validate_sql(sql: str, patient_id: str) -> tuple[bool, str | None]:
     if rogue:
         return _block(f"Table(s) not allowed: {rogue}", sql)
 
-    if not re.search(rf"patient_id\s*=\s*['\"]?{re.escape(pid)}['\"]?", sql, re.I):
-        return _block(f"Missing patient_id = '{pid}'", sql)
+    if not re.search(rf"patient_id\s*=\s*{re.escape(pid)}\b", sql, re.I):
+        return _block(f"Missing patient_id = {pid}", sql)
 
     logger.info("SQL ok patient_id=%s sql=%s", pid, sql)
     return True, None

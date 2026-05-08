@@ -93,8 +93,12 @@ async def _run_llm_fallback(
 
 
 # Builds the route-appropriate tool list (DB, RAG, DB_RAG, or empty).
-def _build_tools_for_route(route: str, patient_id: str, patient_name: str) -> list[Any]:
-    db_tools = create_database_tools(patient_id=patient_id, patient_first_name=patient_name)
+def _build_tools_for_route(route: str, patient_id: str, patient_name: str, sql_query: str | None) -> list[Any]:
+    db_tools = create_database_tools(
+        patient_id=patient_id,
+        patient_first_name=patient_name,
+        sql_query=sql_query or "",
+    )
     rag_tools = create_rag_tools()
 
     if route == "DB":
@@ -117,8 +121,6 @@ async def orchestrate_message(
     logger.info("Orchestration started patient_id=%s", patient_id)
 
     effective_lang = normalize_primary_language(language)
-
-    acknowledge_patient_message(patient_id)
 
     recent_turns = get_recent_turns(patient_id=patient_id, n=3)
     full_memory = load_full_memory(patient_id=patient_id)
@@ -154,7 +156,9 @@ async def orchestrate_message(
             patient_id=patient_id,
         )
 
-    if route == "LLM":
+    acknowledge_patient_message(patient_id)
+
+    if route in {"LLM", "CLARIFY"}:
         assistant_text = await _run_llm_fallback(
             message=message,
             patient_name=patient_name,
@@ -163,7 +167,7 @@ async def orchestrate_message(
             language=effective_lang,
         )
     else:
-        tools = _build_tools_for_route(route, patient_id, patient_name)
+        tools = _build_tools_for_route(route, patient_id, patient_name, sql_query)
         runner = run_agent or default_run_agent
 
         assistant_text = await runner(

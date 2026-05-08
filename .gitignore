@@ -23,3 +23,43 @@ venv/
 .DS_Store
 Thumbs.db
 .idea/
+.vscode/
+*.swp
+*.swo
+
+# Python (backend2 + ai_agent + rag)
+pip-wheel-metadata/
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.pyre/
+.pytype/
+.ipynb_checkpoints/
+
+# Node / frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# Expo / React Native
+.expo/
+.expo-shared/
+android/
+ios/
+
+# Frontend build/test outputs
+.next/
+coverage/
+web-build/
+storybook-static/
+
+# Runtime / local temp
+*.log
+*.pid
+*.out
+tmp/
+temp/
