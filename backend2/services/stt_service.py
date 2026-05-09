@@ -1,3 +1,4 @@
+import logging
 import re
 
 import requests
@@ -5,12 +6,16 @@ from fastapi import HTTPException, UploadFile, status
 
 from core.config import settings
 
+logger = logging.getLogger(__name__)
+
 OPENAI_STT_URL = "https://api.openai.com/v1/audio/transcriptions"
 OPENAI_TRANSLATE_URL = "https://api.openai.com/v1/audio/translations"
 
 
 def is_stt_mock_mode() -> bool:
-    return settings.SPEECH_MOCK_MODE.lower() == "true"
+    import os
+    val = os.getenv("SPEECH_MOCK_MODE", "false")
+    return val.lower() == "true"
 
 
 def _contains_arabic(text: str) -> bool:
@@ -128,13 +133,18 @@ def _translate_audio_to_english(
 
 
 async def transcribe_audio_file(file: UploadFile) -> dict:
+    logger.info("[STT] transcribe_audio_file called — filename=%s content_type=%s", file.filename, file.content_type)
+
     if is_stt_mock_mode():
+        logger.info("[STT] mock mode active — returning canned response")
         return {
             "text": "Mock transcription result. Replace with real STT API when budget is available.",
             "language": "en",
         }
 
     audio_bytes = await file.read()
+    logger.info("[STT] read %d bytes from upload", len(audio_bytes))
+
     if not audio_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -144,21 +154,24 @@ async def transcribe_audio_file(file: UploadFile) -> dict:
     filename = file.filename or "speech_input.wav"
     mime_type = file.content_type or "audio/wav"
 
+    logger.info("[STT] sending to Whisper — filename=%s mime=%s", filename, mime_type)
     spoken_language, raw_text = _detect_original_language_and_text(
         audio_bytes=audio_bytes,
         filename=filename,
         mime_type=mime_type,
     )
+    logger.info("[STT] Whisper detected language=%s raw_text=%r", spoken_language, raw_text)
 
-    # Final text sent to the agent must ALWAYS be English
     if spoken_language == "en":
         english_text = raw_text
     else:
+        logger.info("[STT] non-English detected — translating to English")
         english_text = _translate_audio_to_english(
             audio_bytes=audio_bytes,
             filename=filename,
             mime_type=mime_type,
         )
+        logger.info("[STT] translation result=%r", english_text)
 
     if not english_text:
         raise HTTPException(
@@ -168,5 +181,6 @@ async def transcribe_audio_file(file: UploadFile) -> dict:
 
     return {
         "text": english_text,
+        "original_text": raw_text,
         "language": spoken_language,
     }

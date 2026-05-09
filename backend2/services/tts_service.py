@@ -1,3 +1,4 @@
+import logging
 import math
 import os
 import re
@@ -11,12 +12,16 @@ from fastapi import HTTPException, status
 from core.config import settings
 from db.supabase_client import get_supabase_client
 
+logger = logging.getLogger(__name__)
+
 GENERATED_AUDIO_DIR = "generated_audio"
 os.makedirs(GENERATED_AUDIO_DIR, exist_ok=True)
 
 
 def is_tts_mock_mode() -> bool:
-    return settings.SPEECH_MOCK_MODE.lower() == "true"
+    val = os.getenv("SPEECH_MOCK_MODE", "false")
+    logger.info("[TTS] SPEECH_MOCK_MODE=%r → mock=%s", val, val.lower() == "true")
+    return val.lower() == "true"
 
 
 def get_patient_stage(patient_id: int) -> str:
@@ -67,19 +72,21 @@ def get_voice_id_for_language(language: str) -> str:
     normalized = normalize_language(language)
 
     if normalized == "ar":
-        if not settings.ELEVENLABS_VOICE_ID_AR:
+        voice_id = settings.ELEVENLABS_VOICE_ID_AR or settings.ELEVENLABS_VOICE_ID
+        if not voice_id:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Missing ELEVENLABS_VOICE_ID_AR in .env",
+                detail="Missing ELEVENLABS_VOICE_ID_AR (or ELEVENLABS_VOICE_ID) in .env",
             )
-        return settings.ELEVENLABS_VOICE_ID_AR
+        return voice_id
 
-    if not settings.ELEVENLABS_VOICE_ID_EN:
+    voice_id = settings.ELEVENLABS_VOICE_ID_EN or settings.ELEVENLABS_VOICE_ID
+    if not voice_id:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Missing ELEVENLABS_VOICE_ID_EN in .env",
+            detail="Missing ELEVENLABS_VOICE_ID_EN (or ELEVENLABS_VOICE_ID) in .env",
         )
-    return settings.ELEVENLABS_VOICE_ID_EN
+    return voice_id
 
 
 def normalize_whitespace(text: str) -> str:
@@ -161,11 +168,19 @@ def generate_mock_audio_file() -> str:
 
 
 def synthesize_speech(text: str, patient_id: int, language: str) -> str:
+    logger.info("[TTS] synthesize_speech called — patient_id=%s language=%s text=%r", patient_id, language, text)
+
     patient_stage = normalize_patient_stage(get_patient_stage(patient_id))
+    logger.info("[TTS] patient_stage=%s", patient_stage)
+
     cleaned_text = prepare_tts_text(text, patient_stage)
+    logger.info("[TTS] cleaned_text=%r", cleaned_text)
+
     voice_id = get_voice_id_for_language(language)
+    logger.info("[TTS] voice_id=%s", voice_id)
 
     if is_tts_mock_mode():
+        logger.info("[TTS] mock mode active — generating beep WAV")
         return generate_mock_audio_file()
 
     if not settings.ELEVENLABS_API_KEY:
@@ -189,14 +204,17 @@ def synthesize_speech(text: str, patient_id: int, language: str) -> str:
         "model_id": "eleven_multilingual_v2",
     }
 
+    logger.info("[TTS] calling ElevenLabs API — voice_id=%s", voice_id)
     response = requests.post(
         url,
         headers=headers,
         json=payload,
         timeout=120,
     )
+    logger.info("[TTS] ElevenLabs responded — status=%s content_length=%s", response.status_code, len(response.content))
 
     if response.status_code != 200:
+        logger.error("[TTS] ElevenLabs error — %s", response.text)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"TTS failed: {response.text}",
@@ -207,6 +225,7 @@ def synthesize_speech(text: str, patient_id: int, language: str) -> str:
     with open(output_path, "wb") as audio_file:
         audio_file.write(response.content)
 
+    logger.info("[TTS] MP3 saved to %s (%d bytes)", output_path, len(response.content))
     return output_path
 
 
