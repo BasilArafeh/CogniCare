@@ -392,22 +392,39 @@ class ApiService {
     patientId: number,
     audioUri: string,
   ): Promise<{ transcript: string; replyText: string; audioUri: string }> {
+    const url = `${RAG_BASE_URL}/speech/voice`;
+    console.log('[VOICE] sending recording — url:', url, '| patientId:', patientId, '| audioUri:', audioUri);
+
     const form = new FormData();
     form.append('patient_id', String(patientId));
     form.append('audio', { uri: audioUri, name: 'recording.wav', type: 'audio/wav' } as unknown as Blob);
 
-    const { data } = await this.rag.post<{
-      transcript: string;
-      reply_text: string;
-      audio_url:  string;
-    }>('/voice', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 120_000,
-    });
+    let data: { transcript: string; reply_text: string; audio_url: string };
+    try {
+      const res = await this.rag.post<{
+        transcript: string;
+        reply_text: string;
+        audio_url:  string;
+      }>('/speech/voice', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120_000,
+      });
+      data = res.data;
+      console.log('[VOICE] backend responded — transcript:', data.transcript, '| audio_url:', data.audio_url);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        console.error('[VOICE] request failed — code:', err.code, '| status:', err.response?.status ?? 'no response', '| message:', err.message, '| body:', JSON.stringify(err.response?.data));
+      } else {
+        console.error('[VOICE] unexpected error:', err);
+      }
+      throw err;
+    }
 
-    // Download the response WAV to local storage so expo-av can play it
-    const destUri = `${FileSystem.documentDirectory}response_${patientId}_${Date.now()}.wav`;
+    const ext = data.audio_url.endsWith('.wav') ? '.wav' : '.mp3';
+    const destUri = `${FileSystem.documentDirectory}response_${patientId}_${Date.now()}${ext}`;
+    console.log('[VOICE] downloading audio from', data.audio_url, '→', destUri);
     await FileSystem.downloadAsync(data.audio_url, destUri);
+    console.log('[VOICE] download complete');
 
     return {
       transcript: data.transcript,
