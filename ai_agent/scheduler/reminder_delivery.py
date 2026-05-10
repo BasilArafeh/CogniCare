@@ -34,6 +34,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Literal
 
+from core.connections import supabase_client
 from memory.memory_manager import save_interaction
 from scheduler.queries.reminders_write import insert_reminder_instance, update_reminder_status
 
@@ -265,6 +266,27 @@ def _schedule_followup(
 
 
 # Persists outbound assistant line for reporting, then starts the response window.
+def _send_push(patient_id: str, message: str) -> None:
+    if supabase_client is None:
+        return
+    try:
+        result = supabase_client.table("patients").select("push_token").eq("patient_id", patient_id).limit(1).execute()
+        token = (result.data or [{}])[0].get("push_token")
+        if not token:
+            return
+        payload = json.dumps({"to": token, "title": "Reminder", "body": message}).encode()
+        req = urllib.request.Request(
+            "https://exp.host/--/expoapi/v2/push/send",
+            data=payload,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=10)
+        logger.info("[reminder_delivery] Push sent patient_id=%s", patient_id)
+    except Exception:
+        logger.exception("[reminder_delivery] Push failed patient_id=%s", patient_id)
+
+
 def deliver_reminder_to_patient(
     *,
     patient_id: str,
@@ -304,6 +326,7 @@ def deliver_reminder_to_patient(
         reminder_id,
     )
     _patient_webhook_post(pid, msg)
+    _send_push(pid, msg)
 
     detail = (
         f"{reminder_type} label={label} "

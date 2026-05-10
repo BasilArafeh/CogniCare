@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,12 @@ import PatientGreeting from '../components/patient/PatientGreeting';
 import DailySummary from '../components/patient/DailySummary';
 import ChatBottomBar from '../components/patient/ChatBottomBar';
 import PatientChatSheet from '../components/patient/PatientChatSheet';
+import ReminderModal from '../components/patient/ReminderModal';
+import { getAiAgentBaseUrl } from '../services/backendUrls';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
+import { supabase } from '../services/supabaseClient';
 
 // WAV / Linear PCM recording options.
 // Raw numeric/string values used to avoid enum import issues across expo-av versions.
@@ -73,6 +79,7 @@ export default function PatientHomeScreen() {
   const [responseAudioUri, setResponseAudioUri] = useState('');
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [reminder, setReminder] = useState<{ message: string; reminderId: string | null } | null>(null);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -81,6 +88,61 @@ export default function PatientHomeScreen() {
   // Unload sound when screen unmounts
   React.useEffect(() => {
     return () => { soundRef.current?.unloadAsync(); };
+  }, []);
+
+  const handleReminderReply = async (confirmed: boolean) => {
+    setReminder(null);
+    await fetch(`${getAiAgentBaseUrl()}/agent/reminder-reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patient_id: patientId, confirmed }),
+    });
+  };
+
+  // Listen for push notifications
+  useEffect(() => {
+    // Register push token in background (non-blocking)
+    if (Device.isDevice) {
+      Notifications.requestPermissionsAsync().then(({ status }) => {
+        console.log('[PushToken] permission status:', status);
+        if (status === 'granted') {
+          const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+          console.log('[PushToken] projectId:', projectId);
+          Notifications.getExpoPushTokenAsync({ projectId }).then(tokenData => {
+            console.log('[PushToken] token:', tokenData.data);
+            supabase.from('patients').update({ push_token: tokenData.data }).eq('patient_id', patientId)
+              .then(({ error }) => console.log('[PushToken] saved to db, error:', error));
+          }).catch(err => console.log('[PushToken] getExpoPushTokenAsync error:', err));
+        }
+      }).catch(err => console.log('[PushToken] requestPermissions error:', err));
+    } else {
+      console.log('[PushToken] not a physical device, skipping');
+    }
+
+    // App is open — notification arrives
+    const foreground = Notifications.addNotificationReceivedListener(notification => {
+      const message = notification.request.content.body;
+      if (message) setReminder({ message, reminderId: null });
+    });
+
+    // App is background — user taps notification
+    const tap = Notifications.addNotificationResponseReceivedListener(response => {
+      const message = response.notification.request.content.body;
+      if (message) setReminder({ message, reminderId: null });
+    });
+
+    // App was killed — user tapped notification to open app
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) {
+        const message = response.notification.request.content.body;
+        if (message) setReminder({ message, reminderId: null });
+      }
+    });
+
+    return () => {
+      foreground.remove();
+      tap.remove();
+    };
   }, []);
 
   const greeting = getGreeting();
@@ -192,6 +254,13 @@ export default function PatientHomeScreen() {
       colors={['#F5F0FF', '#FFFFFF', '#EDE8F8']}
       style={[styles.container, { paddingTop: insets.top }]}
     >
+      {reminder && (
+        <ReminderModal
+          message={reminder.message}
+          onYes={() => handleReminderReply(true)}
+          onNo={() => handleReminderReply(false)}
+        />
+      )}
       {/* ── Top Bar ── */}
       <View style={styles.topBar}>
         {/* CogniCare pill */}

@@ -29,6 +29,11 @@
     "plugins": [
       "expo-av",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d6c53024-e249-4b72-8ec8-9d6f48959a92"
+      }
+    }
   }
 }
