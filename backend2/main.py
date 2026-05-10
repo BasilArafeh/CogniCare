@@ -13,16 +13,14 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-from routers import (
-    agent_test,
-    auth,
-    patients,
-    reports,
-    speech,
-    system,
-    twilio_router,
-    twilio_webhooks,
-)
+import routers.agent_test as agent_test
+import routers.auth as auth
+import routers.patients as patients
+import routers.reports as reports
+import routers.speech as speech
+import routers.system as system
+import routers.twilio_router as twilio_router
+import routers.twilio_webhooks as twilio_webhooks
 from services.twilio_service import escalate_stale_alerts
 
 
