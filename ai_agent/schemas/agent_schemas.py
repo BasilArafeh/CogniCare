@@ -27,9 +27,7 @@ class ChatMessageRequest(BaseModel):
 class ReminderReplyRequest(BaseModel):
     """Patient tap or reply after a scheduled reminder."""
 
-    patient_id: str = Field(min_length=1)
-    reminder_type: str = Field(min_length=1)
-    item_label: str = Field(min_length=1)
+    patient_id: int
     confirmed: bool
 
 

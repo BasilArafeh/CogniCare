@@ -70,7 +70,7 @@ def load_config() -> AppConfig:
     return AppConfig(
         openai_api_key=_env("OPENAI_API_KEY"),
         supabase_url=_env("SUPABASE_URL"),
-        supabase_key=_env("SUPABASE_KEY"),
+        supabase_key=_env("SUPABASE_SERVICE_ROLE_KEY"),
         database_url=_env("DATABASE_URL"),
         supabase_db_url=_env("SUPABASE_DB_URL"),
         chroma_path=_env("CHROMA_PATH") or "./chroma_store",

@@ -1,17 +1,17 @@
 """
 Orchestrator-only emergency escalation (not a LangChain agent tool).
 
-Delegates SMS delivery to integrations.twilio_sms.deliver_sms.
+Delegates notification to backend2 via HTTP POST to /internal/emergency.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import urllib.request
 from dataclasses import dataclass
-
-from integrations.twilio_sms import deliver_sms
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,31 @@ class EscalationOutcome:
     escalated: bool
 
 
-# Builds reassurance for the patient, then asks integrations to SMS the caregiver.
+def _post_emergency(backend2_url: str, *, patient_id: str, caregiver_body: str) -> bool:
+    payload = json.dumps(
+        {
+            "patient_id": patient_id,
+            "message": caregiver_body,
+        }
+    ).encode()
+    base = backend2_url.rstrip("/")
+    req = urllib.request.Request(
+        f"{base}/internal/emergency",
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    ok = False
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            ok = 200 <= resp.status < 300
+    except Exception:
+        logger.exception("[emergency_tool] backend2 POST failed")
+        ok = False
+    return ok
+
+
+# Builds reassurance for the patient, then POSTs backend2 for caregiver escalation.
 async def escalate_to_caregiver(
     *,
     patient_id: str,
@@ -45,24 +69,25 @@ async def escalate_to_caregiver(
         "Please contact them immediately."
     )
 
-    caregiver_phone = os.getenv("CAREGIVER_ALERT_SMS", "").strip()
-    if not caregiver_phone:
+    ok = False
+    backend2_url = os.getenv("BACKEND2_URL", "").strip()
+    if backend2_url:
+        ok = await asyncio.to_thread(
+            _post_emergency,
+            backend2_url,
+            patient_id=patient_id,
+            caregiver_body=caregiver_body,
+        )
+
+    if not backend2_url:
         logger.warning(
-            "[emergency_tool] CAREGIVER_ALERT_SMS unset; skipping SMS patient_id=%s",
+            "[emergency_tool] BACKEND2_URL unset; skipping escalation patient_id=%s",
             patient_id,
         )
-        return EscalationOutcome(patient_reply=patient_reply, escalated=False)
+    elif ok:
+        logger.info("[emergency_tool] backend2 escalation ok patient_id=%s", patient_id)
 
-    ok = await asyncio.to_thread(
-        deliver_sms,
-        to_phone=caregiver_phone,
-        body=caregiver_body,
-    )
-    if not ok:
-        return EscalationOutcome(patient_reply=patient_reply, escalated=False)
-
-    logger.info("[emergency_tool] Caregiver SMS dispatched patient_id=%s", patient_id)
-    return EscalationOutcome(patient_reply=patient_reply, escalated=True)
+    return EscalationOutcome(patient_reply=patient_reply, escalated=ok)
 
 
 __all__ = ["EscalationOutcome", "escalate_to_caregiver"]

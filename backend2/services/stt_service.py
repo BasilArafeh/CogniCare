@@ -1,5 +1,9 @@
+"""
+Speech-to-text for backend2: transcribes patient audio with OpenAI, normalizes language,
+and translates Arabic transcripts to English for downstream agent / RAG use.
+"""
+
 import logging
-import re
 
 import requests
 from fastapi import HTTPException, UploadFile, status
@@ -9,178 +13,214 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 OPENAI_STT_URL = "https://api.openai.com/v1/audio/transcriptions"
-OPENAI_TRANSLATE_URL = "https://api.openai.com/v1/audio/translations"
+
+STT_PROMPT = (
+    "Alzheimer's, dementia, caregiver, medication, dosage, "
+    "Donepezil, Memantine, Panadol, appointment, reminder, "
+    "breakfast, lunch, dinner, activity"
+)
 
 
-def is_stt_mock_mode() -> bool:
-    import os
-    val = os.getenv("SPEECH_MOCK_MODE", "false")
-    return val.lower() == "true"
-
-
-def _contains_arabic(text: str) -> bool:
-    return bool(re.search(r"[\u0600-\u06FF]", text or ""))
-
-
-def _openai_audio_request(
-    url: str,
-    audio_bytes: bytes,
-    filename: str,
-    mime_type: str | None,
-    prompt: str | None = None,
-    language_hint: str | None = None,
-) -> dict:
+# Calls OpenAI audio transcription; JSON response includes {"text": "..."} only.
+def _transcribe(audio_bytes: bytes, filename: str, mime_type: str) -> dict:
     if not settings.OPENAI_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Missing OPENAI_API_KEY in .env",
+            detail="OPENAI_API_KEY is not configured",
+        )
+
+    headers = {"Authorization": f"Bearer {settings.OPENAI_API_KEY}"}
+    files = {"file": (filename, audio_bytes, mime_type)}
+    data = {
+        "model": "gpt-4o-transcribe",
+        "response_format": "json",
+        "prompt": STT_PROMPT,
+    }
+
+    resp = requests.post(OPENAI_STT_URL, headers=headers, files=files, data=data, timeout=120)
+
+    if resp.status_code != 200:
+        logger.error("OpenAI transcription failed: %s", resp.text)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OpenAI transcription failed ({resp.status_code}): {resp.text[:800]}",
+        )
+
+    try:
+        return resp.json()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="OpenAI transcription returned invalid JSON",
+        )
+
+
+def _detect_language(text: str) -> str:
+    if not settings.OPENAI_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OPENAI_API_KEY is not configured",
+        )
+
+    stripped = text.strip()
+    if not stripped:
+        return "en"
+
+    headers = {
+        "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Detect the language of the following text. Reply with only 'ar' if Arabic "
+                    "or 'en' if English. Nothing else."
+                ),
+            },
+            {"role": "user", "content": stripped},
+        ],
+        "temperature": 0.1,
+    }
+
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120,
+        )
+    except requests.RequestException:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="OpenAI language detection request failed",
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OpenAI language detection failed ({resp.status_code}): {resp.text[:800]}",
+        )
+
+    try:
+        body = resp.json()
+        content = (
+            body.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content")
+        )
+    except (TypeError, IndexError, KeyError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="OpenAI language detection returned an unexpected response",
+        )
+
+    if content is None or not str(content).strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="OpenAI language detection returned empty content",
+        )
+
+    reply = str(content).strip().lower()
+    return "ar" if reply.startswith("ar") else "en"
+
+
+# Uses chat completions to translate Arabic text into English only.
+def _translate(text: str) -> str:
+    if not settings.OPENAI_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OPENAI_API_KEY is not configured",
         )
 
     headers = {
         "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a translator. Translate the given Arabic text to English. "
+                    "Return only the translated text, nothing else."
+                ),
+            },
+            {"role": "user", "content": text},
+        ],
+        "temperature": 0.2,
     }
 
-    files = {
-        "file": (filename, audio_bytes, mime_type or "application/octet-stream"),
-    }
-
-    data = {
-        "model": "whisper-1",
-        "response_format": "verbose_json",
-    }
-
-    if prompt:
-        data["prompt"] = prompt
-
-    if language_hint and url == OPENAI_STT_URL:
-        data["language"] = language_hint
-
-    response = requests.post(
-        url,
-        headers=headers,
-        files=files,
-        data=data,
-        timeout=120,
-    )
-
-    if response.status_code != 200:
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120,
+        )
+    except requests.RequestException:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Whisper STT failed: {response.text}",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="OpenAI translation request failed",
         )
 
-    return response.json()
-
-
-def _detect_original_language_and_text(
-    audio_bytes: bytes,
-    filename: str,
-    mime_type: str | None,
-) -> tuple[str, str]:
-    """
-    First pass:
-    - detect the spoken language
-    - get the raw transcript
-    This pass is intentionally neutral and does NOT use the large prompt,
-    because the prompt can bias language detection.
-    """
-    result = _openai_audio_request(
-        url=OPENAI_STT_URL,
-        audio_bytes=audio_bytes,
-        filename=filename,
-        mime_type=mime_type,
-    )
-
-    raw_text = (result.get("text") or "").strip()
-    detected_language = (result.get("language") or "").strip().lower()
-
-    # Fix false Arabic detections on English-only transcripts
-    if detected_language == "ar" and not _contains_arabic(raw_text):
-        detected_language = "en"
-
-    # If language is missing or unclear, infer from transcript characters
-    if not detected_language:
-        detected_language = "ar" if _contains_arabic(raw_text) else "en"
-
-    return detected_language, raw_text
-
-
-def _translate_audio_to_english(
-    audio_bytes: bytes,
-    filename: str,
-    mime_type: str | None,
-) -> str:
-    """
-    Second pass:
-    translate spoken non-English audio into English.
-    """
-    result = _openai_audio_request(
-        url=OPENAI_TRANSLATE_URL,
-        audio_bytes=audio_bytes,
-        filename=filename,
-        mime_type=mime_type,
-    )
-
-    english_text = (result.get("text") or "").strip()
-
-    if not english_text:
+    if resp.status_code != 200:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Translation returned empty text",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OpenAI translation failed ({resp.status_code}): {resp.text[:800]}",
         )
 
-    return english_text
+    try:
+        body = resp.json()
+        content = (
+            body.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content")
+        )
+    except (TypeError, IndexError, KeyError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="OpenAI translation returned an unexpected response",
+        )
+
+    if content is None or not str(content).strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="OpenAI translation returned empty content",
+        )
+
+    return str(content).strip()
 
 
-async def transcribe_audio_file(file: UploadFile) -> dict:
-    logger.info("[STT] transcribe_audio_file called — filename=%s content_type=%s", file.filename, file.content_type)
-
-    if is_stt_mock_mode():
-        logger.info("[STT] mock mode active — returning canned response")
-        return {
-            "text": "Mock transcription result. Replace with real STT API when budget is available.",
-            "language": "en",
-        }
-
+# End-to-end: upload → transcribe → optional Arabic→English → { text, language }.
+async def transcribe(file: UploadFile) -> dict:
     audio_bytes = await file.read()
-    logger.info("[STT] read %d bytes from upload", len(audio_bytes))
-
     if not audio_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded audio file is empty",
         )
 
-    filename = file.filename or "speech_input.wav"
+    filename = file.filename or "audio.wav"
     mime_type = file.content_type or "audio/wav"
 
-    logger.info("[STT] sending to Whisper — filename=%s mime=%s", filename, mime_type)
-    spoken_language, raw_text = _detect_original_language_and_text(
-        audio_bytes=audio_bytes,
-        filename=filename,
-        mime_type=mime_type,
-    )
-    logger.info("[STT] Whisper detected language=%s raw_text=%r", spoken_language, raw_text)
+    decoded = _transcribe(audio_bytes, filename, mime_type)
+    raw_text = (decoded.get("text") or "").strip()
 
-    if spoken_language == "en":
+    language = _detect_language(raw_text)
+
+    if language == "en":
         english_text = raw_text
     else:
-        logger.info("[STT] non-English detected — translating to English")
-        english_text = _translate_audio_to_english(
-            audio_bytes=audio_bytes,
-            filename=filename,
-            mime_type=mime_type,
-        )
-        logger.info("[STT] translation result=%r", english_text)
+        english_text = _translate(raw_text)
 
     if not english_text:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="STT returned empty text",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Transcription produced empty English text",
         )
 
-    return {
-        "text": english_text,
-        "original_text": raw_text,
-        "language": spoken_language,
-    }
+    return {"text": english_text, "language": language}

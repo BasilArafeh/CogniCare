@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 
 from core.config import settings
 from schemas.speech import STTResponse, TTSRequest
-from services.stt_service import transcribe_audio_file
+from services.stt_service import transcribe
 from services.tts_service import remove_tts_file, synthesize_speech
 
 logger = logging.getLogger(__name__)
@@ -18,53 +18,9 @@ router = APIRouter(prefix="/speech", tags=["speech"])
 GENERATED_AUDIO_DIR = "generated_audio"
 
 
-@router.post("/stt", response_model=STTResponse)
-async def speech_to_text(
-    patient_id: int = Form(...),
-    file: UploadFile = File(...),
-):
-    logger.info("[STT] patient_id=%s filename=%s content_type=%s", patient_id, file.filename, file.content_type)
-
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No audio file provided")
-
-    result = await transcribe_audio_file(file)
-    logger.info("[STT] transcript=%r language=%s", result["text"], result.get("language"))
-
-    return {
-        "patient_id": patient_id,
-        "text": result["text"],
-        "language": result.get("language"),
-    }
-
-
-@router.post("/tts")
-def text_to_speech(payload: TTSRequest, background_tasks: BackgroundTasks):
-    logger.info("[TTS] patient_id=%s language=%s text=%r", payload.patient_id, payload.language, payload.text)
-
-    output_path = synthesize_speech(
-        text=payload.text,
-        patient_id=payload.patient_id,
-        language=payload.language,
-    )
-    logger.info("[TTS] audio written to %s", output_path)
-
-    background_tasks.add_task(remove_tts_file, output_path)
-
-    media_type = "audio/wav" if output_path.endswith(".wav") else "audio/mpeg"
-    filename = "reply.wav" if output_path.endswith(".wav") else "reply.mp3"
-
-    return FileResponse(
-        path=output_path,
-        media_type=media_type,
-        filename=filename,
-    )
-
-
 async def _delayed_remove(path: str) -> None:
     await asyncio.sleep(120)
     remove_tts_file(path)
-
 
 @router.post("/voice")
 async def voice_pipeline(
@@ -77,11 +33,10 @@ async def voice_pipeline(
                 patient_id, audio.filename, audio.content_type, audio.size)
 
     logger.info("[VOICE] step 1/3 — running STT")
-    stt_result = await transcribe_audio_file(audio)
-    transcript = stt_result["text"]           # always English (for the agent)
+    stt_result = await transcribe(audio)
+    transcript = stt_result["text"]  # for the agent / logging
     language = stt_result.get("language", "en")
-    tts_text = stt_result.get("original_text", transcript)  # original language for TTS
-    logger.info("[VOICE] STT done — language=%s transcript=%r tts_text=%r", language, transcript, tts_text)
+    logger.info("[VOICE] STT done — language=%s transcript=%r", language, transcript)
 
     logger.info("[VOICE] step 2/3 — calling AI agent (url=%s)", settings.AI_AGENT_URL)
     reply_text = transcript
@@ -102,10 +57,9 @@ async def voice_pipeline(
     else:
         logger.info("[VOICE] AI_AGENT_URL not set — skipping agent, echoing transcript")
 
-    tts_text = reply_text if language == "en" else stt_result.get("original_text", reply_text)
-
-    logger.info("[VOICE] step 3/3 — running TTS in language=%s tts_text=%r", language, tts_text)
-    audio_path = await asyncio.to_thread(synthesize_speech, tts_text, patient_id, language)
+    # Always synthesize the assistant reply — never the user's raw utterance (original_text).
+    logger.info("[VOICE] step 3/3 — running TTS in language=%s reply_text=%r", language, reply_text)
+    audio_path = await asyncio.to_thread(synthesize_speech, reply_text, patient_id, language)
     logger.info("[VOICE] TTS done — audio_path=%s", audio_path)
 
     filename = os.path.basename(audio_path)

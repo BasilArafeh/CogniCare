@@ -25,18 +25,23 @@ def _build_agent_system_prompt(
     conversation_history: str,
     language: str,
 ) -> str:
+    norm_lang = normalize_primary_language(language)
     profile_text = (
         patient_profile
         if isinstance(patient_profile, str)
         else json.dumps(patient_profile, ensure_ascii=False, default=str, indent=2)
     )
-    return AGENT_PROMPT.format(
+    critical = (
+        f"CRITICAL INSTRUCTION: You MUST respond ONLY in "
+        f"{'Jordanian Arabic dialect (عامية أردنية). Write exactly as a Jordanian person would speak, not Modern Standard Arabic.' if normalize_primary_language(language) == 'ar' else 'English'}. No exceptions.\n\n"
+    )
+    return critical + AGENT_PROMPT.format(
         patient_name=patient_name,
         diagnosis_stage=diagnosis_stage,
         patient_profile=profile_text,
         conversation_history=conversation_history,
         intent=intent,
-        language=normalize_primary_language(language),
+        language=norm_lang,
     )
 
 
@@ -47,7 +52,7 @@ def _build_agent_input_message(*, message: str, intent: str, sql: Any) -> str:
     return message
 
 
-# Executes one turn via tool-calling when tools exist, otherwise direct ChatOpenAI.
+# Executes one turn via LangGraph ReAct when tools exist, otherwise direct ChatOpenAI.
 async def run_agent(
     *,
     message: str,
@@ -71,6 +76,7 @@ async def run_agent(
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
         from langchain_openai import ChatOpenAI
+        from langgraph.prebuilt import create_react_agent
 
         logger.info(
             "run_agent started intent=%s tools=%s model=%s",
@@ -90,59 +96,22 @@ async def run_agent(
         user_input = _build_agent_input_message(message=message, intent=intent, sql=sql)
 
         if tools:
-            logger.info("run_agent using tool-calling path")
+            logger.info("run_agent using LangGraph ReAct path")
             llm = ChatOpenAI(model=config.agent_llm_model, temperature=0.4)
-            llm_with_tools = llm.bind_tools(tools)
 
-            base_messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=user_input),
-            ]
-            first_rsp = await llm_with_tools.ainvoke(base_messages)
-
-            tool_calls = getattr(first_rsp, "tool_calls", None) or []
-            if not tool_calls:
-                text = str(getattr(first_rsp, "content", "") or "").strip()
-                return text or safe_fallback
-
-            tool_by_name: dict[str, Any] = {}
-            for tool in tools:
-                name = getattr(tool, "name", None) or getattr(tool, "__name__", None)
-                if isinstance(name, str) and name:
-                    tool_by_name[name] = tool
-
-            tool_results: list[str] = []
-            for tool_call in tool_calls:
-                if not isinstance(tool_call, dict):
-                    continue
-                tool_name = str(tool_call.get("name") or "").strip()
-                if not tool_name:
-                    continue
-                tool = tool_by_name.get(tool_name)
-                if tool is None:
-                    tool_results.append(f"{tool_name}: tool not found")
-                    continue
-
-                args = tool_call.get("args", {})
-                try:
-                    result = tool.invoke(args)
-                except TypeError:
-                    if isinstance(args, dict) and len(args) == 1:
-                        only_arg = next(iter(args.values()))
-                        result = tool.invoke(only_arg)
-                    else:
-                        raise
-                tool_results.append(f"{tool_name}: {result}")
-
-            if not tool_results:
-                text = str(getattr(first_rsp, "content", "") or "").strip()
-                return text or safe_fallback
-
-            tool_result_blob = "\n".join(tool_results)
-            final_rsp = await llm.ainvoke(
-                base_messages + [HumanMessage(content=f"Tool result: {tool_result_blob}")]
+            agent = create_react_agent(
+                model=llm,
+                tools=tools,
+                prompt=system_prompt,
             )
-            text = str(getattr(final_rsp, "content", "") or "").strip()
+
+            result = await agent.ainvoke(
+                {"messages": [{"role": "user", "content": user_input}]}
+            )
+
+            messages = result.get("messages", [])
+            last = messages[-1] if messages else None
+            text = str(getattr(last, "content", "") or "").strip()
             return text or safe_fallback
 
         logger.info("run_agent using direct ChatOpenAI path")
@@ -158,4 +127,3 @@ async def run_agent(
     except Exception:
         logger.exception("run_agent failed")
         return safe_fallback
-

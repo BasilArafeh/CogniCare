@@ -1,13 +1,19 @@
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_ENV_FILE = Path(__file__).parent.parent / ".env"
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _BACKEND_DIR.parent
+# Later entries override earlier ones; repo root holds shared secrets, backend2/.env can override locally.
+_ENV_FILES = (_BACKEND_DIR / ".env", _REPO_ROOT / ".env")
 
 
 class Settings(BaseSettings):
     SUPABASE_URL: str
-    SUPABASE_KEY: str
+    SUPABASE_KEY: str = Field(
+        validation_alias=AliasChoices("SUPABASE_KEY", "SUPABASE_ANON_KEY"),
+    )
     SUPABASE_SERVICE_ROLE_KEY: str | None = None
     DATABASE_URL: str | None = None
 
@@ -28,12 +34,13 @@ class Settings(BaseSettings):
     APP_BASE_URL: str | None = None
 
     AI_AGENT_URL: str | None = None
+    PATIENT_REMINDER_WEBHOOK_URL: str | None = None
 
     OPENAI_REPORT_MODEL: str = "gpt-5.5"
     REPORT_WINDOW_DAYS: int = 5
 
     model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
+        env_file=tuple(str(p) for p in _ENV_FILES),
         extra="ignore",
     )
 

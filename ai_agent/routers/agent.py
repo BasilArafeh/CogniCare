@@ -65,21 +65,22 @@ async def agent_chat(req: ChatMessageRequest) -> AgentResponse:
 
 @router.post("/reminder-reply", response_model=AgentResponse)
 async def agent_reminder_reply(req: ReminderReplyRequest) -> AgentResponse:
+    pid = str(req.patient_id)
     try:
-        ack = acknowledge_patient_message(req.patient_id)
+        ack = acknowledge_patient_message(pid)
 
         ts = datetime.now(timezone.utc).isoformat()
         user_payload = {
             "event": "reminder_reply",
-            "patient_id": req.patient_id,
-            "reminder_type": req.reminder_type,
-            "item_label": req.item_label,
+            "patient_id": pid,
+            "reminder_type": ack.reminder_type if ack else None,
+            "item_label": ack.item_label if ack else None,
             "confirmed": req.confirmed,
             "timestamp": ts,
             "scheduler_reminder_id": ack.reminder_id if ack else None,
         }
         save_interaction(
-            patient_id=req.patient_id,
+            patient_id=pid,
             user_text=json.dumps(user_payload, ensure_ascii=False),
             assistant_text=_REMINDER_REPLY_CONFIRMATION,
             detected_intent="REMINDER_RESPONDED",
@@ -88,10 +89,10 @@ async def agent_reminder_reply(req: ReminderReplyRequest) -> AgentResponse:
 
         return AgentResponse(
             response=_REMINDER_REPLY_CONFIRMATION,
-            patient_id=req.patient_id,
+            patient_id=pid,
         )
     except Exception:
-        logger.exception("POST /agent/reminder-reply failed patient_id=%s", req.patient_id)
+        logger.exception("POST /agent/reminder-reply failed patient_id=%s", pid)
         raise HTTPException(status_code=500, detail="Internal server error.") from None
 
 

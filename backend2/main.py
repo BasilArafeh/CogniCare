@@ -1,5 +1,8 @@
 import logging
+from contextlib import asynccontextmanager
 
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 
 logging.basicConfig(
@@ -13,25 +16,43 @@ logger = logging.getLogger(__name__)
 from routers import (
     agent_test,
     auth,
-    notifications,
     patients,
     reports,
     speech,
     system,
+    twilio_router,
     twilio_webhooks,
 )
+from services.twilio_service import escalate_stale_alerts
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(escalate_stale_alerts, IntervalTrigger(minutes=1))
+    scheduler.start()
+    logger.info("Twilio escalation scheduler started")
+    yield
+    scheduler.shutdown(wait=True)
+    logger.info("Twilio escalation scheduler stopped")
+
+
+app = FastAPI(lifespan=lifespan)
 
 from core.config import settings
-logger.info("=== STARTUP: SPEECH_MOCK_MODE=%s | ELEVENLABS_VOICE_ID_EN=%s ===",
-            settings.SPEECH_MOCK_MODE, settings.ELEVENLABS_VOICE_ID_EN)
+
+logger.info(
+    "=== STARTUP: SPEECH_MOCK_MODE=%s | ELEVENLABS_VOICE_ID_EN=%s ===",
+    settings.SPEECH_MOCK_MODE,
+    settings.ELEVENLABS_VOICE_ID_EN,
+)
 
 app.include_router(system.router)
+app.include_router(twilio_router.router)
+app.include_router(twilio_router.internal_router)
 app.include_router(patients.router)
 app.include_router(auth.router)
 app.include_router(speech.router)
-app.include_router(notifications.router)
 app.include_router(twilio_webhooks.router)
 app.include_router(agent_test.router)
 app.include_router(reports.router)

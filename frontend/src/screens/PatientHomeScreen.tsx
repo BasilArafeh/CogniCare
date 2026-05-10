@@ -160,6 +160,7 @@ export default function PatientHomeScreen() {
       const result = await apiService.sendVoiceRecording(patientId, uri);
       setResponseText(result.replyText);
       setResponseAudioUri(result.audioUri);
+      console.log('responseAudioUri', result);
       await playResponse(result.audioUri);
     } catch (err) {
       setVoiceError('Voice message failed. Please try again.');
