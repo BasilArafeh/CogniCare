@@ -59,6 +59,7 @@ class _PendingFollowup:
     reminder_id: str | None
     reminder_type: ReminderKind
     item_label: str
+    message: str
 
 
 _pending_by_patient: dict[str, _PendingFollowup] = {}
@@ -213,6 +214,7 @@ def _log_missed_interaction(
 def _schedule_followup(
     pid: str,
     *,
+    patient_message: str,
     reminder_id: str | None,
     reminder_kind: ReminderKind,
     item_label: str,
@@ -250,6 +252,7 @@ def _schedule_followup(
         reminder_id=reminder_id,
         reminder_type=reminder_kind,
         item_label=item_label,
+        message=patient_message,
     )
     t.start()
     logger.info(
@@ -308,6 +311,7 @@ def deliver_reminder_to_patient(
     )
     _schedule_followup(
         pid,
+        patient_message=msg,
         reminder_id=reminder_id,
         reminder_kind=reminder_type,
         item_label=label,
