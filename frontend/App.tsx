@@ -13,7 +13,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './src/navigation/AppNavigator';
 import * as Notifications from 'expo-notifications';
-import { setPendingReminder } from './src/services/reminderBridge';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -40,27 +39,6 @@ export default function App() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
-
-  // Taps while backgrounded/killed: PatientHome is not mounted yet — stash body for later consume.
-  useEffect(() => {
-    const tap = Notifications.addNotificationResponseReceivedListener((response) => {
-      const message = response.notification.request.content.body;
-      if (message) {
-        console.log('[App] setPendingReminder called with:', message);
-        setPendingReminder(message);
-      }
-    });
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) {
-        const message = response.notification.request.content.body;
-        if (message) {
-          console.log('[App] setPendingReminder called with:', message);
-          setPendingReminder(message);
-        }
-      }
-    });
-    return () => tap.remove();
-  }, []);
 
   if (!fontsLoaded) {
     return null;

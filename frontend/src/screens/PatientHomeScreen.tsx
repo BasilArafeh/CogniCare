@@ -10,7 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { Audio } from 'expo-av';
 import { colors, fonts, withAlpha } from '../theme/colors';
@@ -22,12 +22,11 @@ import DailySummary from '../components/patient/DailySummary';
 import ChatBottomBar from '../components/patient/ChatBottomBar';
 import PatientChatSheet from '../components/patient/PatientChatSheet';
 import ReminderModal from '../components/patient/ReminderModal';
-import { getAiAgentBaseUrl } from '../services/backendUrls';
+import { getRagBaseUrl } from '../services/backendUrls';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { supabase } from '../services/supabaseClient';
-import { consumePendingReminder } from '../services/reminderBridge';
 
 // WAV / Linear PCM recording options.
 // Raw numeric/string values used to avoid enum import issues across expo-av versions.
@@ -93,7 +92,7 @@ export default function PatientHomeScreen() {
 
   const handleReminderReply = async (confirmed: boolean) => {
     setReminder(null);
-    await fetch(`${getAiAgentBaseUrl()}/agent/reminder-reply`, {
+    await fetch(`${getRagBaseUrl()}/agent/reminder-reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ patient_id: patientId, confirmed }),
@@ -101,27 +100,23 @@ export default function PatientHomeScreen() {
   };
 
   useEffect(() => {
-    const msg = consumePendingReminder();
-    console.log('[PatientHome] consumePendingReminder on mount:', msg);
-    if (msg) setReminder({ message: msg, reminderId: null });
-  }, []);
-
-  const tryConsumeBridgedReminder = React.useCallback(() => {
-    const message = consumePendingReminder();
-    if (message) setReminder({ message, reminderId: null });
-  }, []);
-
-  useEffect(() => {
-    tryConsumeBridgedReminder();
-    const id = setTimeout(tryConsumeBridgedReminder, 500);
-    return () => clearTimeout(id);
-  }, [patientId, tryConsumeBridgedReminder]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      tryConsumeBridgedReminder();
-    }, [tryConsumeBridgedReminder]),
-  );
+    if (reminder) return;
+    const interval = setInterval(async () => {
+      try {
+        const url = `${getRagBaseUrl()}/agent/reminders/pending?patient_id=${encodeURIComponent(String(patientId))}`;
+        console.log('[Poll] hitting:', url);
+        const res = await fetch(url);
+        const data = await res.json();
+        console.log('[Poll] response:', JSON.stringify(data));
+        if (data.has_reminder && data.message) {
+          setReminder({ message: data.message, reminderId: null });
+        }
+      } catch (e) {
+        console.log('[Poll] error:', e);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [reminder, patientId]);
 
   // Register push token; foreground delivery (app already open).
   useEffect(() => {
