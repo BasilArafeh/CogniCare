@@ -6,12 +6,12 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from memory.memory_manager import save_interaction
 from orchestration.agent_executor import run_agent
 from orchestration.orchestrator import orchestrate_message
-from scheduler.reminder_delivery import acknowledge_patient_message
+from scheduler.reminder_delivery import _pending_by_patient, acknowledge_patient_message
 from schemas.agent_schemas import (
     AgentResponse,
     ChatMessageRequest,
@@ -62,6 +62,14 @@ async def agent_chat(req: ChatMessageRequest) -> AgentResponse:
         logger.exception("POST /agent/chat failed patient_id=%s", req.patient_id)
         raise HTTPException(status_code=500, detail="Internal server error.") from None
 
+
+@router.get("/reminders/pending")
+async def agent_reminders_pending(patient_id: int = Query(...)) -> dict:
+    pid = str(patient_id)
+    if pid in _pending_by_patient:
+        pending = _pending_by_patient[pid]
+        return {"has_reminder": True, "message": pending.message}
+    return {"has_reminder": False, "message": None}
 
 
 @router.post("/reminder-reply", response_model=AgentResponse)

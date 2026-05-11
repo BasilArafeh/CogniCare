@@ -5,6 +5,7 @@ Activity reminders: cron at clock time from ``start_time``; label from ``activit
 from __future__ import annotations
 
 import logging
+from datetime import tzinfo
 
 from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -31,7 +32,7 @@ def fire_activity_reminder(patient_id: str, activity_label: str | None, schedule
     )
 
 
-def register_activity_jobs(scheduler: BaseScheduler, scheduler_tz: str) -> None:
+def register_activity_jobs(scheduler: BaseScheduler, scheduler_tz: tzinfo) -> None:
     for row in select_activity_schedule_rows():
         rid = row.get("patient_activity_id")
         pid = str(row.get("patient_id") or "").strip()

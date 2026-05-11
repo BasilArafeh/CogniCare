@@ -10,7 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRoute } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { Audio } from 'expo-av';
 import { colors, fonts, withAlpha } from '../theme/colors';
@@ -27,6 +27,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { supabase } from '../services/supabaseClient';
+import { consumePendingReminder } from '../services/reminderBridge';
 
 // WAV / Linear PCM recording options.
 // Raw numeric/string values used to avoid enum import issues across expo-av versions.
@@ -99,9 +100,31 @@ export default function PatientHomeScreen() {
     });
   };
 
-  // Listen for push notifications
   useEffect(() => {
-    // Register push token in background (non-blocking)
+    const msg = consumePendingReminder();
+    console.log('[PatientHome] consumePendingReminder on mount:', msg);
+    if (msg) setReminder({ message: msg, reminderId: null });
+  }, []);
+
+  const tryConsumeBridgedReminder = React.useCallback(() => {
+    const message = consumePendingReminder();
+    if (message) setReminder({ message, reminderId: null });
+  }, []);
+
+  useEffect(() => {
+    tryConsumeBridgedReminder();
+    const id = setTimeout(tryConsumeBridgedReminder, 500);
+    return () => clearTimeout(id);
+  }, [patientId, tryConsumeBridgedReminder]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      tryConsumeBridgedReminder();
+    }, [tryConsumeBridgedReminder]),
+  );
+
+  // Register push token; foreground delivery (app already open).
+  useEffect(() => {
     if (Device.isDevice) {
       Notifications.requestPermissionsAsync().then(({ status }) => {
         console.log('[PushToken] permission status:', status);
@@ -119,31 +142,15 @@ export default function PatientHomeScreen() {
       console.log('[PushToken] not a physical device, skipping');
     }
 
-    // App is open — notification arrives
-    const foreground = Notifications.addNotificationReceivedListener(notification => {
+    const foreground = Notifications.addNotificationReceivedListener((notification) => {
       const message = notification.request.content.body;
       if (message) setReminder({ message, reminderId: null });
     });
 
-    // App is background — user taps notification
-    const tap = Notifications.addNotificationResponseReceivedListener(response => {
-      const message = response.notification.request.content.body;
-      if (message) setReminder({ message, reminderId: null });
-    });
-
-    // App was killed — user tapped notification to open app
-    Notifications.getLastNotificationResponseAsync().then(response => {
-      if (response) {
-        const message = response.notification.request.content.body;
-        if (message) setReminder({ message, reminderId: null });
-      }
-    });
-
     return () => {
       foreground.remove();
-      tap.remove();
     };
-  }, []);
+  }, [patientId]);
 
   const greeting = getGreeting();
 

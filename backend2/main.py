@@ -1,6 +1,8 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
+import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
@@ -26,7 +28,9 @@ from services.twilio_service import escalate_stale_alerts
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(
+        timezone=pytz.timezone((os.getenv("SCHEDULER_TIMEZONE") or "Asia/Amman").strip())
+    )
     scheduler.add_job(escalate_stale_alerts, IntervalTrigger(minutes=1))
     scheduler.start()
     logger.info("Twilio escalation scheduler started")

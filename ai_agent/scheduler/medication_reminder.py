@@ -5,6 +5,7 @@ Medication reminders: APScheduler cron hooks; rows from ``scheduler.queries`` (p
 from __future__ import annotations
 
 import logging
+from datetime import tzinfo
 
 from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -34,7 +35,7 @@ def fire_medication_reminder(patient_id: str, medication_name: str | None, sched
     )
 
 
-def register_medication_jobs(scheduler: BaseScheduler, scheduler_tz: str) -> None:
+def register_medication_jobs(scheduler: BaseScheduler, scheduler_tz: tzinfo) -> None:
     for row in select_medication_schedule_rows():
         rid = row.get("patient_medications_id")
         pid = str(row.get("patient_id") or "").strip()

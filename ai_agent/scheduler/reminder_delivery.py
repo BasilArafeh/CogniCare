@@ -276,7 +276,7 @@ def _send_push(patient_id: str, message: str) -> None:
             return
         payload = json.dumps({"to": token, "title": "Reminder", "body": message}).encode()
         req = urllib.request.Request(
-            "https://exp.host/--/expoapi/v2/push/send",
+            "https://exp.host/--/api/v2/push/send",
             data=payload,
             method="POST",
             headers={"Content-Type": "application/json"},
