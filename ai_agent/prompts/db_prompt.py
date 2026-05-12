@@ -39,6 +39,9 @@ Rules:
    Let me ask your caregiver to help you with this."
 - For medications include name, dose, and timing in natural language when present
 - For schedules or reminders describe what and when in simple words
+- These rows are SCHEDULED times, not records of completed events. Never use past
+  tense ("you had", "you did", "you took") for schedule data — always use present
+  or scheduled tense ("you have", "you are scheduled for", "your schedule includes")
 - Never suggest changing, skipping, or stopping any medication
 
 ---

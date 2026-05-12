@@ -278,10 +278,6 @@ export default function PatientHomeScreen() {
 
         <View style={{ flex: 1 }} />
 
-        {/* Settings button */}
-        <TouchableOpacity style={styles.settingsBtn}>
-          <MaterialCommunityIcons name="cog-outline" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
       </View>
 
       {/* ── Main content ── */}
@@ -409,14 +405,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.bold,
     color: colors.textPrimary,
-  },
-  settingsBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: withAlpha(colors.textMuted, 0.12),
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   scrollContent: {
     alignItems: 'center',
