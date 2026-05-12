@@ -202,7 +202,7 @@ export default function DashboardHomeTab({ patientId, caregiverName, patientName
               <Text style={styles.sectionTitle}>Family Members</Text>
               <View style={styles.card}>
                 {family.map((f, idx) => (
-                  <View key={f.familyMemberId} style={[styles.familyRow, idx < family.length - 1 && styles.scheduleRowBorder]}>
+                  <View key={`family-${f.familyMemberId ?? idx}`} style={[styles.familyRow, idx < family.length - 1 && styles.scheduleRowBorder]}>
                     <View style={styles.familyAvatar}>
                       <Text style={styles.familyAvatarText}>
                         {(f.firstName[0] ?? '?').toUpperCase()}

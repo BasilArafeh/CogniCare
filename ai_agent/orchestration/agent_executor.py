@@ -106,7 +106,8 @@ async def run_agent(
             )
 
             result = await agent.ainvoke(
-                {"messages": [{"role": "user", "content": user_input}]}
+                {"messages": [{"role": "user", "content": user_input}]},
+                config={"recursion_limit": 10},
             )
 
             messages = result.get("messages", [])
