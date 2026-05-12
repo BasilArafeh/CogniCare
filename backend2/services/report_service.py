@@ -1,9 +1,12 @@
 import html
 import json
+import logging
 import os
 import re
 import uuid
 from collections import Counter
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -43,6 +46,7 @@ os.makedirs(REPORTS_DIR, exist_ok=True)
 
 OPENAI_REPORT_MODEL = os.getenv("OPENAI_REPORT_MODEL", "gpt-5.5")
 REPORT_WINDOW_DAYS = int(os.getenv("REPORT_WINDOW_DAYS", "5"))
+STORAGE_BUCKET = os.getenv("REPORTS_STORAGE_BUCKET", "reports")
 
 _TECHNICAL_FAILURE_PATTERNS = [
     "agent stopped",
@@ -227,6 +231,8 @@ def group_repeated_questions(interactions: list) -> list:
     for row in interactions:
         t = str(pick_first(row, ("user_text", "interaction_text", "message"), "") or "").strip()
         if len(t) < 6 or len(t) > 500:
+            continue
+        if t.startswith("["):
             continue
         if _TRIVIAL_PATTERNS.match(t):
             continue
@@ -993,7 +999,26 @@ def _build_repeated_questions_section(repeated_questions: list, styles: dict) ->
 # Main PDF builder — public API (called by routers/reports.py)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _save_report_to_db(patient_id: int, patient_name: str, file_name: str, days: int) -> None:
+def _upload_pdf_to_storage(file_path: str, file_name: str) -> str | None:
+    """Upload generated PDF to Supabase Storage and return its public URL."""
+    try:
+        client = get_supabase_client()
+        with open(file_path, "rb") as f:
+            file_bytes = f.read()
+        client.storage.from_(STORAGE_BUCKET).upload(
+            path=file_name,
+            file=file_bytes,
+            file_options={"content-type": "application/pdf", "upsert": "true"},
+        )
+        url = client.storage.from_(STORAGE_BUCKET).get_public_url(file_name)
+        logger.info("PDF uploaded to Supabase Storage: %s", url)
+        return url
+    except Exception:
+        logger.exception("Failed to upload PDF to Supabase Storage bucket=%s", STORAGE_BUCKET)
+        return None
+
+
+def _save_report_to_db(patient_id: int, patient_name: str, file_name: str, days: int, storage_url: str | None = None) -> None:
     """Insert a row into the report table after PDF generation. Non-fatal on error."""
     try:
         client = get_supabase_client()
@@ -1026,6 +1051,7 @@ def _save_report_to_db(patient_id: int, patient_name: str, file_name: str, days:
             "title": f"{days}-day health report for {patient_name}",
             "period": period,
             "file_name": file_name,
+            "storage_url": storage_url or "",
         })
         client.table("report").insert({
             "caregiver_id": caregiver_id,
@@ -1139,7 +1165,8 @@ def build_patient_report_pdf(patient_id: int, days: int = REPORT_WINDOW_DAYS) ->
         story += _build_repeated_questions_section(repeated_questions, styles)
 
     doc.build(story, onFirstPage=_add_footer, onLaterPages=_add_footer)
-    _save_report_to_db(patient_id, patient_name, file_name, days)
+    storage_url = _upload_pdf_to_storage(file_path, file_name)
+    _save_report_to_db(patient_id, patient_name, file_name, days, storage_url=storage_url)
     return file_path
 
 

@@ -880,7 +880,7 @@ export async function deleteEmergencyContact(caregiverId: number, caregiverPrior
 export async function getWeeklyReports(caregiverId: number, patientId: number): Promise<WeeklyReportDisplay[]> {
     try {
       const { data } = await db.get<ReportRow[]>(
-        `/report?caregiver_id=eq.${caregiverId}&select=*&order=report_date.desc`,
+        `/report?caregiver_id=eq.${caregiverId}&select=*&order=report_id.desc`,
       );
       console.log('[API] getWeeklyReports: raw rows =', JSON.stringify(data));
       return data.map((r) => {
@@ -899,7 +899,7 @@ export async function getWeeklyReports(caregiverId: number, patientId: number): 
           reportDate: r.report_date,
           title,
           period,
-          pdfUrl: `${getAiAgentBaseUrl()}/reports/patient/${patientId}/pdf`,
+          pdfUrl: `${getAiAgentBaseUrl()}/reports/${r.report_id}/pdf`,
         };
       });
     } catch (err) {
