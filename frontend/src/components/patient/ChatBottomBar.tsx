@@ -30,10 +30,7 @@ export default function ChatBottomBar({ onChatTap }: Props) {
         {/* Placeholder text */}
         <Text style={styles.placeholder}>Ask me anything...</Text>
 
-        {/* Mic button */}
-        <View style={styles.micBtn}>
-          <MaterialCommunityIcons name="microphone" size={18} color={colors.primary} />
-        </View>
+
       </BlurView>
     </TouchableOpacity>
   );
@@ -73,13 +70,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: fonts.regular,
     color: colors.textMuted,
-  },
-  micBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

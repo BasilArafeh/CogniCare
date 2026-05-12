@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { supabase } from './supabaseClient';
 import { sendVoiceRecordingPipeline } from './aiAgentSpeechService';
-import { getRagBaseUrl } from './backendUrls';
+import { getRagBaseUrl, getAiAgentBaseUrl } from './backendUrls';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -899,7 +899,7 @@ export async function getWeeklyReports(caregiverId: number, patientId: number): 
           reportDate: r.report_date,
           title,
           period,
-          pdfUrl: `${RAG_BASE_URL}/reports/patient/${patientId}/pdf`,
+          pdfUrl: `${getAiAgentBaseUrl()}/reports/patient/${patientId}/pdf`,
         };
       });
     } catch (err) {
@@ -909,7 +909,7 @@ export async function getWeeklyReports(caregiverId: number, patientId: number): 
   }
 
 export function getPdfUrl(patientId: number): string {
-  return `${RAG_BASE_URL}/reports/patient/${patientId}/pdf`;
+  return `${getAiAgentBaseUrl()}/reports/patient/${patientId}/pdf`;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────
