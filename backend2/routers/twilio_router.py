@@ -1,5 +1,5 @@
 """
-Twilio-related HTTP routes: caregiver SMS alerting, escalation flows, utility SMS,
+Twilio-related HTTP routes: caregiver WhatsApp alerting, escalation flows, utility SMS,
 non-Twilio-form inbound reply handling, and internal hooks used by ai_agent
 (reminder fan-out and emergency escalation to caregivers).
 """
@@ -21,6 +21,7 @@ from services.twilio_service import (
     get_prioritized_caregivers,
     handle_incoming_caregiver_reply,
     send_sms,
+    send_whatsapp,
     start_agent_alert,
 )
 
@@ -33,7 +34,7 @@ router = APIRouter(prefix="/twilio", tags=["twilio"])
 internal_router = APIRouter(prefix="/internal", tags=["internal"])
 
 
-# Starts the timed caregiver SMS escalation chain for agent-driven alerts.
+# Starts the timed caregiver WhatsApp escalation chain for agent-driven alerts.
 @router.post("/caregiver-alert", response_model=AgentAlertSessionResponse)
 def send_caregiver_alert(payload: SendCaregiverAlertRequest):
     return start_agent_alert(
@@ -51,22 +52,28 @@ def test_sms(payload: TestSMSRequest):
     )
 
 
-# Parses an inbound caregiver SMS reply without Twilio TwiML wrappers (explicit form fields).
+# Parses an inbound caregiver reply without Twilio TwiML wrappers (explicit form fields).
 @router.post("/incoming-reply")
 def incoming_reply(
     from_number: str = Form(),
     to_number: str = Form(),
     body: str = Form(""),
 ):
+    clean_from = from_number.strip()
+    clean_to = to_number.strip()
+    if clean_from.lower().startswith("whatsapp:"):
+        clean_from = clean_from.split(":", 1)[1]
+    if clean_to.lower().startswith("whatsapp:"):
+        clean_to = clean_to.split(":", 1)[1]
     reply_text = handle_incoming_caregiver_reply(
-        from_number=from_number,
-        to_number=to_number,
+        from_number=clean_from,
+        to_number=clean_to,
         body=body,
     )
     return {"reply": reply_text}
 
 
-# Sends an emergency SMS to the top-priority caregiver for the given patient (ai_agent).
+# Sends an emergency WhatsApp to the top-priority caregiver for the given patient (ai_agent).
 @internal_router.post("/emergency")
 def notify_emergency(body: InternalEmergencyRequest) -> dict[str, bool | int]:
     try:
@@ -84,8 +91,8 @@ def notify_emergency(body: InternalEmergencyRequest) -> dict[str, bool | int]:
             detail="No caregiver available for this patient",
         )
 
-    send_sms(caregivers[0]["contact_no"], body.message.strip())
-    logger.info("[internal] Emergency SMS dispatched patient_id=%s", pid)
+    send_whatsapp(caregivers[0]["contact_no"], body.message.strip())
+    logger.info("[internal] Emergency WhatsApp dispatched patient_id=%s", pid)
     return {"ok": True, "patient_id": pid}
 
 

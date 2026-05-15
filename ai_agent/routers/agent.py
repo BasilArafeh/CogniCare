@@ -76,7 +76,9 @@ async def agent_reminders_pending(patient_id: int = Query(...)) -> dict:
 async def agent_reminder_reply(req: ReminderReplyRequest) -> AgentResponse:
     pid = str(req.patient_id)
     try:
-        ack = acknowledge_patient_message(pid)
+        ack = None
+        if req.confirmed:
+            ack = acknowledge_patient_message(pid)
 
         ts = datetime.now(timezone.utc).isoformat()
         user_payload = {

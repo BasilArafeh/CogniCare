@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str | None = None
     TWILIO_AUTH_TOKEN: str | None = None
     TWILIO_PHONE_NUMBER: str | None = None
+    TWILIO_WHATSAPP_NUMBER: str = "whatsapp:+14155238886"
+    TWILIO_WHATSAPP_MODE: str = "true"
     TWILIO_MOCK_MODE: str = "true"
-    TWILIO_REPLY_TIMEOUT_MINUTES: int = 5
+    TWILIO_REPLY_TIMEOUT_SECONDS: int = 25
     APP_BASE_URL: str | None = None
 
     AI_AGENT_URL: str | None = None

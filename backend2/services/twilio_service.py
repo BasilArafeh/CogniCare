@@ -1,8 +1,9 @@
 """
-Twilio integration for CogniCare: outbound SMS (real or mock), E.164 validation,
-caregiver SMS alert chains with in-memory session state, caregiver_priority ordering,
-time-based escalation via escalate_stale_alerts, and inbound SMS reply handling
-(acknowledge / escalate semantics with optional priority swap when a backup responds).
+Twilio integration for CogniCare: outbound SMS (test endpoint) and WhatsApp (caregiver
+alerts), E.164 validation, caregiver alert chains with in-memory session state,
+caregiver_priority ordering, time-based escalation via escalate_stale_alerts, and
+inbound reply handling (acknowledge / escalate semantics with optional priority swap
+when a backup responds).
 """
 
 from __future__ import annotations
@@ -286,7 +287,46 @@ def send_sms(to_number: str, body: str) -> dict[str, Any]:
     }
 
 
-# Builds the SMS body shown to caregivers with patient name and YES/NO hint.
+# Sends one WhatsApp message via Twilio (or mock dict); destination is E.164, channel prefix added.
+def send_whatsapp(to_number: str, body: str) -> dict[str, Any]:
+    to_number = _require_e164(to_number)
+    to_whatsapp = f"whatsapp:{to_number}"
+    from_whatsapp = (settings.TWILIO_WHATSAPP_NUMBER or "").strip()
+    if not from_whatsapp and not is_twilio_mock_mode():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Missing TWILIO_WHATSAPP_NUMBER in .env",
+        )
+
+    if is_twilio_mock_mode():
+        return {
+            "sid": "MOCK_TWILIO_SID",
+            "status": "queued",
+            "to": to_whatsapp,
+            "from": from_whatsapp or "whatsapp:+14155238886",
+            "body": body,
+            "source": "mock",
+        }
+
+    twilio_client = get_twilio_client()
+
+    message = twilio_client.messages.create(
+        body=body,
+        from_=from_whatsapp,
+        to=to_whatsapp,
+    )
+
+    return {
+        "sid": message.sid,
+        "status": message.status,
+        "to": message.to,
+        "from": message.from_,
+        "body": body,
+        "source": "whatsapp",
+    }
+
+
+# Builds the alert body shown to caregivers with patient name and YES/NO hint.
 def build_alert_message(patient_id: int, base_message: str) -> str:
     patient = get_patient(patient_id)
     if not patient:
@@ -300,7 +340,7 @@ def build_alert_message(patient_id: int, base_message: str) -> str:
     )
 
 
-# Starts (or short-circuits) the in-memory alert chain: SMS first caregiver, track session and expiry.
+# Starts (or short-circuits) the in-memory alert chain: WhatsApp first caregiver, track session and expiry.
 def start_agent_alert(patient_id: int, message: str) -> dict:
     existing = ACTIVE_ALERTS.get(patient_id)
     if existing and existing["status"] in {"pending", "escalated"} and not existing["responded"]:
@@ -319,7 +359,7 @@ def start_agent_alert(patient_id: int, message: str) -> dict:
 
     first_caregiver = caregivers[0]
     sms_body = build_alert_message(patient_id, message)
-    send_sms(first_caregiver["contact_no"], sms_body)
+    send_whatsapp(first_caregiver["contact_no"], sms_body)
     create_alert_record(first_caregiver["caregiver_id"], "agent_alert")
 
     ACTIVE_ALERTS[patient_id] = {
@@ -330,7 +370,7 @@ def start_agent_alert(patient_id: int, message: str) -> dict:
         "current_caregiver_id": first_caregiver["caregiver_id"],
         "responded": False,
         "status": "pending",
-        "expires_at": _now() + timedelta(minutes=settings.TWILIO_REPLY_TIMEOUT_MINUTES),
+        "expires_at": _now() + timedelta(seconds=settings.TWILIO_REPLY_TIMEOUT_SECONDS),
     }
 
     return {
@@ -340,7 +380,7 @@ def start_agent_alert(patient_id: int, message: str) -> dict:
     }
 
 
-# Moves alert to the next prioritized caregiver: resolves current alert, sends SMS, updates state.
+# Moves alert to the next prioritized caregiver: resolves current alert, sends WhatsApp, updates state.
 def _escalate_to_next_caregiver(
     patient_id: int,
     reason_message: str,
@@ -364,13 +404,13 @@ def _escalate_to_next_caregiver(
 
     next_caregiver = caregivers[next_index]
     sms_body = build_alert_message(patient_id, reason_message)
-    send_sms(next_caregiver["contact_no"], sms_body)
+    send_whatsapp(next_caregiver["contact_no"], sms_body)
     create_alert_record(next_caregiver["caregiver_id"], "agent_alert")
 
     state["current_index"] = next_index
     state["current_caregiver_id"] = next_caregiver["caregiver_id"]
     state["status"] = "escalated"
-    state["expires_at"] = _now() + timedelta(minutes=settings.TWILIO_REPLY_TIMEOUT_MINUTES)
+    state["expires_at"] = _now() + timedelta(seconds=settings.TWILIO_REPLY_TIMEOUT_SECONDS)
 
     return True
 

@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler(
         timezone=pytz.timezone((os.getenv("SCHEDULER_TIMEZONE") or "Asia/Amman").strip())
     )
-    scheduler.add_job(escalate_stale_alerts, IntervalTrigger(minutes=1))
+    scheduler.add_job(escalate_stale_alerts, IntervalTrigger(seconds=10))
     scheduler.start()
     logger.info("Twilio escalation scheduler started")
     yield
