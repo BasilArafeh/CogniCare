@@ -135,7 +135,17 @@ def load_full_memory(patient_id: str) -> dict[str, Any]:
         return {"history": [], "profile": {}}
 
 
-# Fast path for per-turn orchestration: fetch only patient profile memory.
+def _coerce_single_row(data: Any) -> dict[str, Any]:
+    if data is None:
+        return {}
+    if isinstance(data, list):
+        return data[0] if data else {}
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+# Fast path for per-turn orchestration: patients row + patient_memory merged.
 def load_patient_profile(patient_id: str) -> dict[str, Any]:
     if supabase_client is None:
         logger.warning(
@@ -144,6 +154,15 @@ def load_patient_profile(patient_id: str) -> dict[str, Any]:
         )
         return {}
     try:
+        patient_response = (
+            supabase_client.table("patients")
+            .select("patient_id, first_name, last_name, address, diagnosis_stage")
+            .eq("patient_id", patient_id)
+            .limit(1)
+            .execute()
+        )
+        patient_row = _coerce_single_row(patient_response.data)
+
         memory_response = (
             supabase_client.table("patient_memory")
             .select("*")
@@ -151,12 +170,23 @@ def load_patient_profile(patient_id: str) -> dict[str, Any]:
             .maybe_single()
             .execute()
         )
-        raw_profile = memory_response.data
-        if raw_profile is None:
-            return {}
-        if isinstance(raw_profile, list):
-            return raw_profile[0] if raw_profile else {}
-        return raw_profile
+        memory_row = _coerce_single_row(memory_response.data)
+
+        profile: dict[str, Any] = {**patient_row, **memory_row}
+        if patient_row.get("first_name"):
+            profile["first_name"] = patient_row["first_name"]
+        elif memory_row.get("preferred_name"):
+            profile["first_name"] = memory_row["preferred_name"]
+        if patient_row.get("diagnosis_stage"):
+            profile["diagnosis_stage"] = patient_row["diagnosis_stage"]
+
+        logger.info(
+            "load_patient_profile: patient_id=%s first_name=%s profile_keys=%s",
+            patient_id,
+            profile.get("first_name"),
+            sorted(profile.keys()),
+        )
+        return profile
     except Exception:
         logger.exception("Failed to load patient profile for patient_id=%s", patient_id)
         return {}

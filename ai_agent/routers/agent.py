@@ -50,12 +50,22 @@ async def agent_voice(req: VoiceMessageRequest) -> AgentResponse:
 
 @router.post("/chat", response_model=AgentResponse)
 async def agent_chat(req: ChatMessageRequest) -> AgentResponse:
-    logger.info("POST /agent/chat hit | patient_id=%s | language=%s | message=%s", req.patient_id, req.language, req.message)
+    detected_language = req.language or "en"
+    if any("\u0600" <= c <= "\u06ff" for c in req.message):
+        detected_language = "ar"
+
+    logger.info(
+        "POST /agent/chat hit | patient_id=%s | language=%s | detected=%s | message=%s",
+        req.patient_id,
+        req.language,
+        detected_language,
+        req.message,
+    )
     try:
         return await orchestrate_message(
             patient_id=_normalize_patient_id(req.patient_id),
             message=req.message,
-            language=req.language,
+            language=detected_language,
             run_agent=run_agent,
         )
     except Exception:

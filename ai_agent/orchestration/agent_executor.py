@@ -32,8 +32,16 @@ def _build_agent_system_prompt(
         else json.dumps(patient_profile, ensure_ascii=False, default=str, indent=2)
     )
     critical = (
-        f"CRITICAL INSTRUCTION: You MUST respond ONLY in "
-        f"{'Jordanian Arabic dialect (عامية أردنية). Write exactly as a Jordanian person would speak, not Modern Standard Arabic.' if normalize_primary_language(language) == 'ar' else 'English'}. No exceptions.\n\n"
+        "NON-NEGOTIABLE LANGUAGE RULE: You MUST write your ENTIRE response ONLY in "
+        + (
+            "Jordanian Arabic dialect (عامية أردنية). Write exactly as a Jordanian person would speak in daily life. "
+            "Do NOT use Modern Standard Arabic. Do NOT use any English words or sentences. "
+            "The patient spoke Arabic — reply in Arabic no matter what language their question appears in."
+            if normalize_primary_language(language) == "ar"
+            else
+            "English. Do not use any Arabic words or sentences."
+        )
+        + "\n\n"
     )
     return critical + AGENT_PROMPT.format(
         patient_name=patient_name,

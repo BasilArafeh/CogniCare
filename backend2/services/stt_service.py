@@ -145,7 +145,9 @@ def _translate(text: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "You are a translator. Translate the given Arabic text to English. "
+                    "You are a medical Arabic-to-English translator specializing in Alzheimer's patient speech. "
+                    "Translate the Arabic text to natural English preserving the original meaning exactly. "
+                    "'شو اسمي' means 'What is my name?' — translate questions as questions, not statements. "
                     "Return only the translated text, nothing else."
                 ),
             },

@@ -44,6 +44,10 @@ Examples:
 - "Do I have any appointments today?"
 - "What time is my next dose?"
 - "Did I take my pill this morning?"
+- "Where do I live?"
+- "What is my address?"
+- "وين أسكن؟"
+- "ما عنواني؟"
 
 
 RAG — Knowledge Retrieval
@@ -171,7 +175,7 @@ Use single SELECT statements only. Do not reference interaction_log,
 --------------------------------------------------
 patients
 --------------------------------------------------
-patient_id, first_name, last_name
+patient_id, first_name, last_name, address, diagnosis_stage, dob
 
 
 --------------------------------------------------

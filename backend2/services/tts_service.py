@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import uuid
@@ -6,6 +7,8 @@ import requests
 from fastapi import HTTPException, status
 
 from core.config import settings
+
+logger = logging.getLogger(__name__)
 
 GENERATED_AUDIO_DIR = "generated_audio"
 os.makedirs(GENERATED_AUDIO_DIR, exist_ok=True)
@@ -50,13 +53,16 @@ def remove_tts_file(file_path: str) -> None:
 
 
 def _clean_text(text: str) -> str:
-    t = text.replace("•", ".")
-    t = re.sub(r"(?m)^\s*-\s+", ". ", t)
+    # Replace literal \n and actual newlines with a space
+    t = text.replace("\\n", " ").replace("\n", " ")
+    # Remove bullet dashes at line starts
+    t = re.sub(r"(?m)^\s*[-•]\s+", " ", t)
+    # Replace number ranges like ٤-٦ or 4-6 with "إلى"
+    t = re.sub(r"([\d\u0660-\u0669])\s*-\s*([\d\u0660-\u0669])", r"\1 إلى \2", t)
+    # Remove multiple spaces
     t = " ".join(t.split()).strip()
-
     if t and t[-1] not in ".!?":
         t += "."
-
     return t
 
 
@@ -73,6 +79,7 @@ def synthesize_speech(text: str, patient_id: int, language: str) -> str:
         )
 
     voice_id = get_voice_id_for_language(normalized_lang)
+    logger.info("TTS voice_id=%s language=%s", voice_id, normalized_lang)
 
     if not settings.ELEVENLABS_API_KEY:
         raise HTTPException(
@@ -82,15 +89,25 @@ def synthesize_speech(text: str, patient_id: int, language: str) -> str:
 
     url = (
         f"https://api.elevenlabs.io/v1/text-to-speech/"
-        f"{voice_id}?output_format=mp3_44100_128"
+        f"{voice_id}/stream?output_format=mp3_44100_128"
     )
     headers = {
         "xi-api-key": settings.ELEVENLABS_API_KEY,
         "Content-Type": "application/json",
     }
-    payload = {"text": cleaned_text, "model_id": "eleven_multilingual_v2"}
+    payload = {
+        "text": cleaned_text,
+        "model_id": "eleven_multilingual_v2" if normalized_lang == "ar" else "eleven_turbo_v2_5",
+        "voice_settings": {
+            "stability": 0.35,
+            "similarity_boost": 0.90,
+            "style": 0.35,
+            "use_speaker_boost": True,
+            "speed": 1.05,
+        },
+    }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=120)
+    response = requests.post(url, headers=headers, json=payload, timeout=120, stream=True)
 
     if response.status_code != 200:
         raise HTTPException(
@@ -100,6 +117,8 @@ def synthesize_speech(text: str, patient_id: int, language: str) -> str:
 
     output_path = os.path.join(GENERATED_AUDIO_DIR, f"{uuid.uuid4()}.mp3")
     with open(output_path, "wb") as f:
-        f.write(response.content)
+        for chunk in response.iter_content(chunk_size=4096):
+            if chunk:
+                f.write(chunk)
 
     return output_path
