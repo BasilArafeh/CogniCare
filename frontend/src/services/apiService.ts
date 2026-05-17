@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { supabase } from './supabaseClient';
 import { sendVoiceRecordingPipeline } from './aiAgentSpeechService';
-import { getRagBaseUrl } from './backendUrls';
+import { getRagBaseUrl, getAiAgentBaseUrl } from './backendUrls';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -880,7 +880,7 @@ export async function deleteEmergencyContact(caregiverId: number, caregiverPrior
 export async function getWeeklyReports(caregiverId: number, patientId: number): Promise<WeeklyReportDisplay[]> {
     try {
       const { data } = await db.get<ReportRow[]>(
-        `/report?caregiver_id=eq.${caregiverId}&select=*&order=report_date.desc`,
+        `/report?caregiver_id=eq.${caregiverId}&select=*&order=report_id.desc`,
       );
       console.log('[API] getWeeklyReports: raw rows =', JSON.stringify(data));
       return data.map((r) => {
@@ -899,7 +899,7 @@ export async function getWeeklyReports(caregiverId: number, patientId: number): 
           reportDate: r.report_date,
           title,
           period,
-          pdfUrl: `${RAG_BASE_URL}/reports/patient/${patientId}/pdf`,
+          pdfUrl: `${getAiAgentBaseUrl()}/reports/${r.report_id}/pdf`,
         };
       });
     } catch (err) {
@@ -909,7 +909,7 @@ export async function getWeeklyReports(caregiverId: number, patientId: number): 
   }
 
 export function getPdfUrl(patientId: number): string {
-  return `${RAG_BASE_URL}/reports/patient/${patientId}/pdf`;
+  return `${getAiAgentBaseUrl()}/reports/patient/${patientId}/pdf`;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────
