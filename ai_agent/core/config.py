@@ -12,9 +12,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Shared `.env` lives at CogniCare repository root (parent of `ai_agent/`).
+# Shared `.env` at repo root, then optional `ai_agent/.env` for agent-only keys (webhooks, etc.).
 _COGNICARE_ROOT = Path(__file__).resolve().parents[2]
+_AI_AGENT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(_COGNICARE_ROOT / ".env")
+load_dotenv(_AI_AGENT_ROOT / ".env")
 
 
 # Reads one environment variable as a stripped string or None when unset/blank.
@@ -70,7 +72,7 @@ def load_config() -> AppConfig:
     return AppConfig(
         openai_api_key=_env("OPENAI_API_KEY"),
         supabase_url=_env("SUPABASE_URL"),
-        supabase_key=_env("SUPABASE_KEY"),
+        supabase_key=_env("SUPABASE_SERVICE_ROLE_KEY"),
         database_url=_env("DATABASE_URL"),
         supabase_db_url=_env("SUPABASE_DB_URL"),
         chroma_path=_env("CHROMA_PATH") or "./chroma_store",

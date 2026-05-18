@@ -1,28 +1,50 @@
-import os
-from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _BACKEND_DIR.parent
+# Later entries override earlier ones; repo root holds shared secrets, backend2/.env can override locally.
+_ENV_FILES = (_BACKEND_DIR / ".env", _REPO_ROOT / ".env")
 
 
-class Settings:
-    SUPABASE_URL: str | None = os.getenv("SUPABASE_URL")
-    SUPABASE_KEY: str | None = os.getenv("SUPABASE_KEY")
-    SUPABASE_SERVICE_ROLE_KEY: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+class Settings(BaseSettings):
+    SUPABASE_URL: str
+    SUPABASE_KEY: str = Field(
+        validation_alias=AliasChoices("SUPABASE_KEY", "SUPABASE_ANON_KEY"),
+    )
+    SUPABASE_SERVICE_ROLE_KEY: str | None = None
+    DATABASE_URL: str | None = None
 
-    OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
-    ELEVENLABS_API_KEY: str | None = os.getenv("ELEVENLABS_API_KEY")
-    ELEVENLABS_VOICE_ID: str | None = os.getenv("ELEVENLABS_VOICE_ID")
-    SPEECH_MOCK_MODE: str = os.getenv("SPEECH_MOCK_MODE", "true")
+    OPENAI_API_KEY: str | None = None
 
-    TWILIO_ACCOUNT_SID: str | None = os.getenv("TWILIO_ACCOUNT_SID")
-    TWILIO_AUTH_TOKEN: str | None = os.getenv("TWILIO_AUTH_TOKEN")
-    TWILIO_PHONE_NUMBER: str | None = os.getenv("TWILIO_PHONE_NUMBER")
-    APP_BASE_URL: str | None = os.getenv("APP_BASE_URL")
-    TWILIO_MOCK_MODE: str = os.getenv("TWILIO_MOCK_MODE", "true")
-    TWILIO_REPLY_TIMEOUT_MINUTES: int = int(os.getenv("TWILIO_REPLY_TIMEOUT_MINUTES", "10"))
+    ELEVENLABS_API_KEY: str | None = None
+    ELEVENLABS_VOICE_ID: str | None = None
+    ELEVENLABS_VOICE_ID_EN: str | None = None
+    ELEVENLABS_VOICE_ID_AR: str | None = None
+
+    SPEECH_MOCK_MODE: str = "false"
+
+    TWILIO_ACCOUNT_SID: str | None = None
+    TWILIO_AUTH_TOKEN: str | None = None
+    TWILIO_PHONE_NUMBER: str | None = None
+    TWILIO_WHATSAPP_NUMBER: str = "whatsapp:+14155238886"
+    TWILIO_WHATSAPP_MODE: str = "true"
+    TWILIO_MOCK_MODE: str = "true"
+    TWILIO_REPLY_TIMEOUT_SECONDS: int = 25
+    APP_BASE_URL: str | None = None
+
+    AI_AGENT_URL: str | None = None
+    PATIENT_REMINDER_WEBHOOK_URL: str | None = None
+
+    OPENAI_REPORT_MODEL: str = "gpt-5.5"
+    REPORT_WINDOW_DAYS: int = 5
+
+    model_config = SettingsConfigDict(
+        env_file=tuple(str(p) for p in _ENV_FILES),
+        extra="ignore",
+    )
 
 
 settings = Settings()
-
-if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
-    raise RuntimeError("Missing SUPABASE_URL or SUPABASE_KEY in .env")

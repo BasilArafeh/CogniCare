@@ -7,7 +7,7 @@ times from Supabase, registers cron jobs, and reloads schedules every hour.
 When a cron fires:
   - Insert a ``reminders`` row (status ``sent``), log outbound copy to ``interaction_log``,
     POST JSON ``{patient_id, message}`` to ``PATIENT_REMINDER_WEBHOOK_URL``, then start a
-    5-minute ``threading.Timer``.
+    short (e.g. 20-second) ``threading.Timer``.
 
 If the patient replies in time:
   - Teammate 2 calls ``POST /agent/reminder-reply`` (structured reply, no LLM) or any
@@ -34,12 +34,13 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Literal
 
+from core.connections import supabase_client
 from memory.memory_manager import save_interaction
 from scheduler.queries.reminders_write import insert_reminder_instance, update_reminder_status
 
 logger = logging.getLogger(__name__)
 
-RESPONSE_WINDOW_SEC = 300
+RESPONSE_WINDOW_SEC = 20
 
 ReminderKind = Literal["medication", "meal", "activity"]
 
@@ -59,6 +60,7 @@ class _PendingFollowup:
     reminder_id: str | None
     reminder_type: ReminderKind
     item_label: str
+    message: str
 
 
 _pending_by_patient: dict[str, _PendingFollowup] = {}
@@ -121,13 +123,20 @@ def _supersede_active_reminder(pid: str) -> None:
     )
 
 
+def _response_window_phrase_for_message() -> str:
+    """Human-readable window length for caregiver SMS (minutes vs seconds)."""
+    sec = RESPONSE_WINDOW_SEC
+    if sec >= 60:
+        return f"{sec // 60} minute(s)"
+    return f"{sec} second(s)"
+
+
 def _post_missed_reminder_escalation(
     *,
     patient_id: str,
+    patient_name: str,
     reminder_kind: ReminderKind,
     item_label: str,
-    reminder_id: str | None,
-    detail_suffix: str,
 ) -> bool:
     """
     Notify an external service (e.g. Teammate 2) so they can SMS the caregiver via Twilio.
@@ -142,19 +151,14 @@ def _post_missed_reminder_escalation(
         )
         return False
 
-    readable = {"medication": "medication", "meal": "meal", "activity": "activity"}[reminder_kind]
-    summary = (
-        f"No reply within {RESPONSE_WINDOW_SEC // 60} minutes after outbound {readable} "
-        f"reminder for '{item_label}'."
-    )
+    duration = _response_window_phrase_for_message()
     payload_obj = {
-        "event": "reminder_missed_no_reply",
-        "patient_id": patient_id,
-        "reminder_type": reminder_kind,
-        "item_label": item_label,
-        "reminder_id": reminder_id,
-        "summary": summary.strip(),
-        "detail": detail_suffix.strip()[:500],
+        "patient_id": int(patient_id),
+        "message": (
+            f"Patient alert for {patient_name}. Patient missed their {reminder_kind} reminder "
+            f"for '{item_label}'. No response within {duration} from {patient_name}. "
+            "Please reply YES to acknowledge."
+        ),
     }
     payload = json.dumps(payload_obj).encode("utf-8")
     req = urllib.request.Request(
@@ -213,10 +217,11 @@ def _log_missed_interaction(
 def _schedule_followup(
     pid: str,
     *,
+    patient_message: str,
+    patient_name: str,
     reminder_id: str | None,
     reminder_kind: ReminderKind,
     item_label: str,
-    detail_suffix: str,
 ) -> None:
     captured_timer_holder: list[threading.Timer | None] = [None]
 
@@ -229,10 +234,9 @@ def _schedule_followup(
         update_reminder_status(reminder_id, "missed")
         posted = _post_missed_reminder_escalation(
             patient_id=pid,
+            patient_name=patient_name,
             reminder_kind=reminder_kind,
             item_label=item_label,
-            reminder_id=reminder_id,
-            detail_suffix=detail_suffix,
         )
         _log_missed_interaction(
             patient_id=pid,
@@ -250,6 +254,7 @@ def _schedule_followup(
         reminder_id=reminder_id,
         reminder_type=reminder_kind,
         item_label=item_label,
+        message=patient_message,
     )
     t.start()
     logger.info(
@@ -262,12 +267,34 @@ def _schedule_followup(
 
 
 # Persists outbound assistant line for reporting, then starts the response window.
+def _send_push(patient_id: str, message: str) -> None:
+    if supabase_client is None:
+        return
+    try:
+        result = supabase_client.table("patients").select("push_token").eq("patient_id", patient_id).limit(1).execute()
+        token = (result.data or [{}])[0].get("push_token")
+        if not token:
+            return
+        payload = json.dumps({"to": token, "title": "Reminder", "body": message}).encode()
+        req = urllib.request.Request(
+            "https://exp.host/--/api/v2/push/send",
+            data=payload,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=10)
+        logger.info("[reminder_delivery] Push sent patient_id=%s", patient_id)
+    except Exception:
+        logger.exception("[reminder_delivery] Push failed patient_id=%s", patient_id)
+
+
 def deliver_reminder_to_patient(
     *,
     patient_id: str,
     patient_message: str,
     reminder_type: ReminderKind,
     item_label: str,
+    patient_name: str | None = None,
     patient_medications_id: str | None = None,
     patient_meal_id: str | None = None,
     patient_activity_id: str | None = None,
@@ -301,17 +328,35 @@ def deliver_reminder_to_patient(
         reminder_id,
     )
     _patient_webhook_post(pid, msg)
+    _send_push(pid, msg)
 
-    detail = (
-        f"{reminder_type} label={label} "
-        f"med_row={patient_medications_id} meal_row={patient_meal_id} act_row={patient_activity_id}"
-    )
+    resolved_patient_name = (patient_name or "").strip()
+    if not resolved_patient_name:
+        resolved_patient_name = f"Patient {pid}"
+        if supabase_client is not None:
+            try:
+                result = (
+                    supabase_client.table("patients")
+                    .select("first_name, last_name")
+                    .eq("patient_id", pid)
+                    .limit(1)
+                    .execute()
+                )
+                if result.data:
+                    row = result.data[0]
+                    resolved_patient_name = (
+                        f"{row.get('first_name', '')} {row.get('last_name', '')}".strip()
+                    ) or resolved_patient_name
+            except Exception:
+                pass
+
     _schedule_followup(
         pid,
+        patient_message=msg,
+        patient_name=resolved_patient_name,
         reminder_id=reminder_id,
         reminder_kind=reminder_type,
         item_label=label,
-        detail_suffix=detail,
     )
 
 

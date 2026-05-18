@@ -20,8 +20,9 @@ from langchain_core.messages import SystemMessage
 from langchain_openai import ChatOpenAI
 
 from core.config import config
+from core.connections import supabase_client
 from core.language_tags import normalize_primary_language
-from memory.memory_manager import get_recent_turns, load_full_memory, save_interaction
+from memory.memory_manager import get_recent_turns, load_patient_profile, save_interaction
 from orchestration.agent_executor import run_agent as default_run_agent
 from prompts.llm_prompt import LLM_PROMPT
 from routers.intent_router import route_intent
@@ -34,28 +35,6 @@ from tools.rag_tool import create_rag_tools
 logger = logging.getLogger(__name__)
 
 AgentRunner = Callable[..., Awaitable[str]]
-
-
-# Returns display name and stage from profile dict with safe defaults.
-def _extract_patient_identity(profile: dict[str, Any]) -> tuple[str, str]:
-    first_name = str(profile.get("first_name") or "there").strip() or "there"
-    diagnosis_stage = str(profile.get("diagnosis_stage") or "moderate").strip().lower()
-    if diagnosis_stage not in {"mild", "moderate", "severe"}:
-        diagnosis_stage = "moderate"
-    return first_name, diagnosis_stage
-
-
-# Converts loaded history rows into prompt-friendly conversation lines.
-def _history_rows_to_text(history_rows: list[dict[str, Any]]) -> str:
-    if not history_rows:
-        return "No history yet."
-    lines: list[str] = []
-    for row in history_rows:
-        user_text = row.get("user_text") or ""
-        assistant_text = row.get("assistant_text") or ""
-        lines.append(f"Patient: {user_text}")
-        lines.append(f"Assistant: {assistant_text}")
-    return "\n".join(lines)
 
 
 # LLM-only route: single completion with LLM_PROMPT (no tools / no ReAct).
@@ -76,7 +55,18 @@ async def _run_llm_fallback(
         else f"I'm here with you, {patient_name}. I'm having a little trouble right now, but I can try again."
     )
     try:
-        system_content = LLM_PROMPT.format(
+        critical = (
+            "NON-NEGOTIABLE LANGUAGE RULE: You MUST write your ENTIRE response ONLY in "
+            + (
+                "Jordanian Arabic dialect (عامية أردنية). Write exactly as a Jordanian person would speak. "
+                "Do NOT use Modern Standard Arabic. Do NOT use any English words or sentences. "
+                "The patient spoke Arabic — reply in Arabic no matter what language their message appears in."
+                if lang == "ar"
+                else "English. Do not use any Arabic words or sentences."
+            )
+            + "\n\n"
+        )
+        system_content = critical + LLM_PROMPT.format(
             patient_name=patient_name,
             diagnosis_stage=diagnosis_stage,
             conversation_history=conversation_history,
@@ -123,11 +113,27 @@ async def orchestrate_message(
     effective_lang = normalize_primary_language(language)
 
     recent_turns = get_recent_turns(patient_id=patient_id, n=3)
-    full_memory = load_full_memory(patient_id=patient_id)
-    profile = full_memory.get("profile", {}) if isinstance(full_memory, dict) else {}
-    history_rows = full_memory.get("history", []) if isinstance(full_memory, dict) else []
-    patient_name, diagnosis_stage = _extract_patient_identity(profile if isinstance(profile, dict) else {})
-    conversation_history = _history_rows_to_text(history_rows if isinstance(history_rows, list) else [])
+    profile = load_patient_profile(patient_id=patient_id)
+
+    patient_name = "there"
+    diagnosis_stage = "moderate"
+    try:
+        name_response = (
+            supabase_client.table("patients")
+            .select("first_name, diagnosis_stage")
+            .eq("patient_id", patient_id)
+            .maybe_single()
+            .execute()
+        )
+        if name_response.data:
+            patient_name = str(name_response.data.get("first_name") or "there").strip() or "there"
+            diagnosis_stage = str(name_response.data.get("diagnosis_stage") or "moderate").strip().lower()
+            if diagnosis_stage not in {"mild", "moderate", "severe"}:
+                diagnosis_stage = "moderate"
+    except Exception:
+        logger.exception("Failed to load patient name for patient_id=%s", patient_id)
+
+    conversation_history = recent_turns or "No history yet."
 
     routed = await route_intent(
         message=message,

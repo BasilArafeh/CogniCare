@@ -25,18 +25,31 @@ def _build_agent_system_prompt(
     conversation_history: str,
     language: str,
 ) -> str:
+    norm_lang = normalize_primary_language(language)
     profile_text = (
         patient_profile
         if isinstance(patient_profile, str)
         else json.dumps(patient_profile, ensure_ascii=False, default=str, indent=2)
     )
-    return AGENT_PROMPT.format(
+    critical = (
+        "NON-NEGOTIABLE LANGUAGE RULE: You MUST write your ENTIRE response ONLY in "
+        + (
+            "Jordanian Arabic dialect (عامية أردنية). Write exactly as a Jordanian person would speak in daily life. "
+            "Do NOT use Modern Standard Arabic. Do NOT use any English words or sentences. "
+            "The patient spoke Arabic — reply in Arabic no matter what language their question appears in."
+            if normalize_primary_language(language) == "ar"
+            else
+            "English. Do not use any Arabic words or sentences."
+        )
+        + "\n\n"
+    )
+    return critical + AGENT_PROMPT.format(
         patient_name=patient_name,
         diagnosis_stage=diagnosis_stage,
         patient_profile=profile_text,
         conversation_history=conversation_history,
         intent=intent,
-        language=normalize_primary_language(language),
+        language=norm_lang,
     )
 
 
@@ -47,7 +60,7 @@ def _build_agent_input_message(*, message: str, intent: str, sql: Any) -> str:
     return message
 
 
-# Executes one turn via ReAct tools when available, otherwise direct ChatOpenAI.
+# Executes one turn via LangGraph ReAct when tools exist, otherwise direct ChatOpenAI.
 async def run_agent(
     *,
     message: str,
@@ -69,11 +82,9 @@ async def run_agent(
         )
     )
     try:
-        # LangChain 1.x: ReAct helpers live in langchain-classic, not langchain.agents.
-        from langchain_classic.agents import AgentExecutor, create_react_agent
         from langchain_core.messages import HumanMessage, SystemMessage
-        from langchain_core.prompts import PromptTemplate
         from langchain_openai import ChatOpenAI
+        from langgraph.prebuilt import create_react_agent
 
         logger.info(
             "run_agent started intent=%s tools=%s model=%s",
@@ -82,7 +93,6 @@ async def run_agent(
             config.agent_llm_model,
         )
 
-        llm = ChatOpenAI(model=config.agent_llm_model, temperature=0.4)
         system_prompt = _build_agent_system_prompt(
             intent=intent,
             patient_name=patient_name,
@@ -94,31 +104,27 @@ async def run_agent(
         user_input = _build_agent_input_message(message=message, intent=intent, sql=sql)
 
         if tools:
-            logger.info("run_agent using ReAct executor")
-            react_prompt = PromptTemplate.from_template(
-                "{system_prompt}\n\n"
-                "You can use these tools:\n{tools}\n\n"
-                "Tool names: {tool_names}\n\n"
-                "Question: {input}\n"
-                "Thought: {agent_scratchpad}"
-            ).partial(system_prompt=system_prompt)
+            logger.info("run_agent using LangGraph ReAct path")
+            llm = ChatOpenAI(model=config.agent_llm_model, temperature=0.4)
 
-            react_agent = create_react_agent(
-                llm=llm,
+            agent = create_react_agent(
+                model=llm,
                 tools=tools,
-                prompt=react_prompt,
+                prompt=system_prompt,
             )
-            executor = AgentExecutor(
-                agent=react_agent,
-                tools=tools,
-                max_iterations=3,
-                handle_parsing_errors=True,
+
+            result = await agent.ainvoke(
+                {"messages": [{"role": "user", "content": user_input}]},
+                config={"recursion_limit": 10},
             )
-            result = await executor.ainvoke({"input": user_input})
-            text = str(result.get("output") or "").strip()
+
+            messages = result.get("messages", [])
+            last = messages[-1] if messages else None
+            text = str(getattr(last, "content", "") or "").strip()
             return text or safe_fallback
 
         logger.info("run_agent using direct ChatOpenAI path")
+        llm = ChatOpenAI(model=config.agent_llm_model, temperature=0.4)
         rsp = await llm.ainvoke(
             [
                 SystemMessage(content=system_prompt),
@@ -130,4 +136,3 @@ async def run_agent(
     except Exception:
         logger.exception("run_agent failed")
         return safe_fallback
-

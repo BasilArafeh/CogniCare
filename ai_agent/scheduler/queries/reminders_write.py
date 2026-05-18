@@ -39,8 +39,19 @@ def insert_reminder_instance(
     }
 
     try:
-        resp = supabase_client.table("reminders").insert(payload).select("reminder_id").execute()
+        resp = supabase_client.table("reminders").insert(payload).execute()
         rows = resp.data or []
+        if not rows:
+            # fallback: query the latest reminder for this patient
+            fallback = (
+                supabase_client.table("reminders")
+                .select("reminder_id")
+                .eq("patient_id", patient_id.strip())
+                .order("reminder_time", desc=True)
+                .limit(1)
+                .execute()
+            )
+            rows = fallback.data or []
         if not rows:
             logger.error("[queries.reminders_write] insert returned no row patient_id=%s", patient_id)
             return None

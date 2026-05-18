@@ -133,10 +133,13 @@ def _retrieve(question: str) -> str:
 
     embedding = _embed_query(q)
     if embedding is None:
+        logger.error("RAG retrieve failed: embedding returned None for question=%r", q)
         return FALLBACK_TEXT
 
     contents = _rpc_match_contents(embedding, match_count=3)
+    logger.info("RAG chunks retrieved: %s for question=%r", len(contents), q)
     if not contents:
+        logger.warning("RAG retrieve: RPC returned 0 chunks for question=%r", q)
         return FALLBACK_TEXT
 
     blob = "\n\n".join(c for c in contents if c.strip())

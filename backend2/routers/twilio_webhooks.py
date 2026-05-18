@@ -15,9 +15,17 @@ def twilio_incoming_webhook(
     to_number: str = Form(..., alias="To"),
     body: str = Form("", alias="Body"),
 ):
+    # Twilio WhatsApp sends e.g. whatsapp:+962796140963; DB stores E.164 without prefix.
+    clean_from = from_number.strip()
+    clean_to = to_number.strip()
+    if clean_from.lower().startswith("whatsapp:"):
+        clean_from = clean_from.split(":", 1)[1]
+    if clean_to.lower().startswith("whatsapp:"):
+        clean_to = clean_to.split(":", 1)[1]
+
     reply_text = handle_incoming_caregiver_reply(
-        from_number=from_number,
-        to_number=to_number,
+        from_number=clean_from,
+        to_number=clean_to,
         body=body,
     )
 

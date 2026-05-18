@@ -45,6 +45,7 @@ export default function CaregiverDashboardScreen({ route, navigation }: Props) {
         return (
           <DashboardReportsTab
             patientId={patientId}
+            caregiverId={caregiverId}
             patientName={patientName}
           />
         );

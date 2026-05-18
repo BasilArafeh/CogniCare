@@ -1,18 +1,13 @@
 from pydantic import BaseModel
 
 
-class STTRequest(BaseModel):
-    audio_base64: str
-    mime_type: str | None = None
-    language: str | None = None
+class STTResponse(BaseModel):
+    patient_id: int
+    text: str
+    language: str 
 
 
 class TTSRequest(BaseModel):
+    patient_id: int
     text: str
-    patient_stage: str | None = None
-
-
-class TTSInfoResponse(BaseModel):
-    message: str
-    audio_file: str
-    source: str
+    language: str

@@ -1,22 +1,35 @@
-import axios, { AxiosInstance } from 'axios';
-import * as FileSystem from 'expo-file-system/legacy';
+import axios from 'axios';
 import { supabase } from './supabaseClient';
+import { sendVoiceRecordingPipeline } from './aiAgentSpeechService';
+import { getRagBaseUrl, getAiAgentBaseUrl } from './backendUrls';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-// Python backend URL — set EXPO_PUBLIC_RAG_URL in frontend/.env
-const RAG_BASE_URL = process.env.EXPO_PUBLIC_RAG_URL ?? 'http://localhost:8000';
+const RAG_BASE_URL = getRagBaseUrl();
+console.log('[API] RAG / general backend base URL =', RAG_BASE_URL);
 
-export class ApiException extends Error {
-  constructor(
-    message: string,
-    public readonly statusCode?: number,
-    public readonly body?: unknown,
-  ) {
-    super(message);
-    this.name = 'ApiException';
-  }
+const db = axios.create({
+  baseURL: `${SUPABASE_URL}/rest/v1`,
+  timeout: 30_000,
+  headers: {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  },
+});
+
+const rag = axios.create({
+  baseURL: RAG_BASE_URL,
+  timeout: 60_000,
+});
+
+function raiseSetupError(message: string, statusCode?: number, body?: unknown): never {
+  const err = new Error(message) as Error & { statusCode?: number; body?: unknown };
+  err.statusCode = statusCode;
+  err.body = body;
+  throw err;
 }
 
 // ─── Payload shapes ───────────────────────────────────────────────────────────
@@ -259,21 +272,20 @@ export interface EmergencyContactDisplay {
   priorityLevel: number;
 }
 
-interface WeeklyReportRow {
+interface ReportRow {
   report_id: number;
-  patient_id: number;
-  week_start: string;
-  week_end: string;
-  pdf_url: string | null;
-  created_at: string;
+  caregiver_id: number;
+  report_date: string;
+  description: string | Record<string, unknown> | null;
 }
 
 export interface WeeklyReportDisplay {
   reportId: number;
-  weekStart: string;
-  weekEnd: string;
-  pdfUrl: string | null;
-  createdAt: string;
+  caregiverId: number;
+  reportDate: string;
+  title: string;
+  period: string;
+  pdfUrl: string;
 }
 
 
@@ -284,147 +296,85 @@ function pinToPassword(pin: string): string {
   return `${pin}${pin}`;
 }
 
-// ─── API Service ──────────────────────────────────────────────────────────────
+// ─── RAG HTTP (`EXPO_PUBLIC_RAG_URL`) + speech via `aiAgentSpeechService` ───
 
-class ApiService {
-  private readonly db: AxiosInstance;
-  private readonly rag: AxiosInstance;
-
-  constructor() {
-    this.db = axios.create({
-      baseURL: `${SUPABASE_URL}/rest/v1`,
-      timeout: 30_000,
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation',
-      },
-    });
-
-    // Python RAG backend — no auth headers needed
-    this.rag = axios.create({
-      baseURL: RAG_BASE_URL,
-      timeout: 60_000,
-    });
+export async function pingBackend(): Promise<boolean> {
+  try {
+    const { data } = await rag.get<{ status: string }>('/health', { timeout: 5_000 });
+    return data.status === 'ok';
+  } catch {
+    return false;
   }
+}
 
-  // ─── RAG Backend ─────────────────────────────────────────────────────────
-  //
-  // Expected backend endpoints:
-  //
-  //   GET  /health
-  //        → 200 { status: "ok" }
-  //
-  //   POST /agent/chat
-  //        Body: { patient_id: string, message: string, language: string }
-  //        → 200 { response: string, patient_id: string }
-  //
-  //   POST /voice
-  //        Body: multipart/form-data  { patient_id: number, audio: File (WAV) }
-  //        → 200 { transcript: string, reply_text: string, audio_url: string }
-  //               audio_url is a full URL this server serves (GET returns WAV bytes)
-  //
-  //   POST /reports/generate/{patient_id}
-  //        → triggers report generation; result appears in weekly_report table
-
-  async pingBackend(): Promise<boolean> {
-    try {
-      const { data } = await this.rag.get<{ status: string }>('/health', { timeout: 5_000 });
-      return data.status === 'ok';
-    } catch {
-      return false;
+export async function sendChatMessage(patientId: number, message: string, language = 'en'): Promise<string> {
+  const url = `${RAG_BASE_URL}/agent/chat`;
+  try {
+    const { data } = await rag.post<{ response: string }>('/agent/chat', {
+      patient_id: String(patientId),
+      message,
+      language,
+    });
+    return data.response;
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error('[API] sendChatMessage', url, err.response?.status, err.message);
     }
+    throw err;
   }
+}
 
-  async sendChatMessage(patientId: number, message: string, language = 'en'): Promise<string> {
-    const url = `${RAG_BASE_URL}/agent/chat`;
-    console.log('[API] sendChatMessage: hitting', url, '| patient_id =', patientId, '| language =', language, '| message =', message);
-    try {
-      const { data } = await this.rag.post<{ response: string }>('/agent/chat', {
-        patient_id: String(patientId),
-        message,
-        language,
-      });
-      console.log('[API] sendChatMessage: reply =', data.response);
-      return data.response;
-    } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        console.error('[API] sendChatMessage FAILED | url =', url, '| status =', err.response?.status ?? 'no response', '| code =', err.code, '| message =', err.message, '| body =', JSON.stringify(err.response?.data));
-      } else {
-        console.error('[API] sendChatMessage FAILED | unexpected error =', err);
-      }
-      throw err;
+export async function sendVoiceRecording(
+  patientId: number,
+  audioUri: string,
+): Promise<{ transcript: string; replyText: string; audioUri: string }> {
+  try {
+    return await sendVoiceRecordingPipeline(patientId, audioUri);
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error('[VOICE]', err.response?.status, err.message);
     }
+    throw err;
   }
+}
 
-  async sendVoiceRecording(
-    patientId: number,
-    audioUri: string,
-  ): Promise<{ transcript: string; replyText: string; audioUri: string }> {
-    const form = new FormData();
-    form.append('patient_id', String(patientId));
-    form.append('audio', { uri: audioUri, name: 'recording.wav', type: 'audio/wav' } as unknown as Blob);
+// ─── Lookup tables (meal / activity / medication) ───────────────────────────
 
-    const { data } = await this.rag.post<{
-      transcript: string;
-      reply_text: string;
-      audio_url:  string;
-    }>('/voice', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 120_000,
-    });
+export async function findOrCreateMealId(mealType: string): Promise<number> {
+  const name = normalizeLabel(mealType);
+  const { data } = await db.get<Array<{ meal_id: number }>>(
+    `/meals?meal_type=ilike.${encodeURIComponent(name)}&select=meal_id`,
+  );
+  if (data[0]) return data[0].meal_id;
+  const { data: [created] } = await db.post<Array<{ meal_id: number }>>(
+    '/meals', { meal_type: name },
+  );
+  return created.meal_id;
+}
 
-    // Download the response WAV to local storage so expo-av can play it
-    const destUri = `${FileSystem.documentDirectory}response_${patientId}_${Date.now()}.wav`;
-    await FileSystem.downloadAsync(data.audio_url, destUri);
+export async function findOrCreateActivityId(activityType: string): Promise<number> {
+  const name = normalizeLabel(activityType);
+  const { data } = await db.get<Array<{ activity_id: number }>>(
+    `/activity?activity_type=ilike.${encodeURIComponent(name)}&select=activity_id`,
+  );
+  if (data[0]) return data[0].activity_id;
+  const { data: [created] } = await db.post<Array<{ activity_id: number }>>(
+    '/activity', { activity_type: name },
+  );
+  return created.activity_id;
+}
 
-    return {
-      transcript: data.transcript,
-      replyText:  data.reply_text,
-      audioUri:   destUri,
-    };
-  }
-
-  // ─── Lookup-table helpers (find or create) ────────────────────────────────
-  // Meals, activities, and medications are shared lookup tables.
-  // Always reuse an existing row before inserting a new one.
-
-  private async findOrCreateMealId(mealType: string): Promise<number> {
-    const name = normalizeLabel(mealType);
-    const { data } = await this.db.get<Array<{ meal_id: number }>>(
-      `/meals?meal_type=ilike.${encodeURIComponent(name)}&select=meal_id`,
-    );
-    if (data[0]) return data[0].meal_id;
-    const { data: [created] } = await this.db.post<Array<{ meal_id: number }>>(
-      '/meals', { meal_type: name },
-    );
-    return created.meal_id;
-  }
-
-  private async findOrCreateActivityId(activityType: string): Promise<number> {
-    const name = normalizeLabel(activityType);
-    const { data } = await this.db.get<Array<{ activity_id: number }>>(
-      `/activity?activity_type=ilike.${encodeURIComponent(name)}&select=activity_id`,
-    );
-    if (data[0]) return data[0].activity_id;
-    const { data: [created] } = await this.db.post<Array<{ activity_id: number }>>(
-      '/activity', { activity_type: name },
-    );
-    return created.activity_id;
-  }
-
-  private async findOrCreateMedicationId(medicationName: string, notes: string): Promise<number> {
-    const name = normalizeLabel(medicationName);
-    const { data } = await this.db.get<Array<{ medication_id: number }>>(
-      `/medication?medication_name=ilike.${encodeURIComponent(name)}&select=medication_id`,
-    );
-    if (data[0]) return data[0].medication_id;
-    const { data: [created] } = await this.db.post<Array<{ medication_id: number }>>(
-      '/medication', { medication_name: name, medication_description: orNull(notes) },
-    );
-    return created.medication_id;
-  }
+export async function findOrCreateMedicationId(medicationName: string, notes: string): Promise<number> {
+  const name = normalizeLabel(medicationName);
+  const { data } = await db.get<Array<{ medication_id: number }>>(
+    `/medication?medication_name=ilike.${encodeURIComponent(name)}&select=medication_id`,
+  );
+  if (data[0]) return data[0].medication_id;
+  const { data: [created] } = await db.post<Array<{ medication_id: number }>>(
+    '/medication', { medication_name: name, medication_description: orNull(notes) },
+  );
+  return created.medication_id;
+}
 
   /**
    * Full onboarding insert into Supabase across 10+ tables.
@@ -437,7 +387,7 @@ class ApiService {
    *   → family_member (batch)
    *   → caregiver + caregiver_priority for each emergency contact
    */
-  async postSetup(payload: SetupPayload): Promise<{ patientId: number; caregiverId: number }> {
+export async function postSetup(payload: SetupPayload): Promise<{ patientId: number; caregiverId: number }> {
     console.log('[API] postSetup: starting onboarding setup');
     try {
       // ── 0. Create Supabase Auth users for caregiver + patient (non-fatal) ──────
@@ -452,7 +402,7 @@ class ApiService {
         });
         if (authError) {
           console.error('[API] postSetup: caregiver auth signup failed —', authError.message);
-          throw new ApiException(`Caregiver sign-up failed: ${authError.message}`);
+          raiseSetupError(`Caregiver sign-up failed: ${authError.message}`);
         }
         if (authData.user) {
           authUserId = authData.user.id;
@@ -486,7 +436,7 @@ class ApiService {
         : null;
 
       console.log('[API] postSetup: inserting patient row');
-      const { data: patientsRows } = await this.db.post<Array<{ patient_id: number }>>(
+      const { data: patientsRows } = await db.post<Array<{ patient_id: number }>>(
         '/patients',
         {
           first_name: payload.patient.first_name,
@@ -510,7 +460,7 @@ class ApiService {
       const [cgFirst, ...cgRest] = caregiverName.split(' ');
 
       console.log('[API] postSetup: inserting caregiver row');
-      const { data: caregiverRows } = await this.db.post<Array<{ caregiver_id: number }>>(
+      const { data: caregiverRows } = await db.post<Array<{ caregiver_id: number }>>(
         '/caregiver',
         {
           patient_id: patientId,
@@ -530,7 +480,7 @@ class ApiService {
       // created_at / updated_at have DB defaults — omit them.
       const allergiesRaw = (payload.patient.allergies as string) ?? '';
       console.log('[API] postSetup: inserting patient_memory');
-      await this.db.post('/patient_memory', {
+      await db.post('/patient_memory', {
         patient_id: patientId,
         communication_profile: {
           pace: 'slow',
@@ -550,7 +500,7 @@ class ApiService {
 
       // ── 4. caregiver_priority (primary caregiver = level 1) ─────────────────
       console.log('[API] postSetup: inserting caregiver_priority (level 1)');
-      await this.db.post('/caregiver_priority', {
+      await db.post('/caregiver_priority', {
         patient_id: patientId,
         caregiver_id: caregiverId,
         priority_level: 1,
@@ -561,10 +511,10 @@ class ApiService {
       // ── 5. medications ───────────────────────────────────────────────────────
       console.log('[API] postSetup: inserting', payload.medications.length, 'medication(s)');
       for (const med of payload.medications) {
-        const medicationId = await this.findOrCreateMedicationId(
+        const medicationId = await findOrCreateMedicationId(
           med.name as string, med.notes as string,
         );
-        await this.db.post('/patient_medications', {
+        await db.post('/patient_medications', {
           medication_id: medicationId,
           patient_id: patientId,
           medication_time: toTime(med.time as string) ?? '00:00:00',
@@ -576,8 +526,8 @@ class ApiService {
       // ── 6. meals ─────────────────────────────────────────────────────────────
       console.log('[API] postSetup: inserting', payload.meals.length, 'meal(s)');
       for (const meal of payload.meals) {
-        const mealId = await this.findOrCreateMealId(meal.meal_name as string);
-        await this.db.post('/patient_meals', {
+        const mealId = await findOrCreateMealId(meal.meal_name as string);
+        await db.post('/patient_meals', {
           meal_id: mealId,
           patient_id: patientId,
           meal_time: toTime(meal.meal_time as string) ?? '00:00:00',
@@ -588,8 +538,8 @@ class ApiService {
       // ── 7. activities ─────────────────────────────────────────────────────────
       console.log('[API] postSetup: inserting', payload.activities.length, 'activity/activities');
       for (const act of payload.activities) {
-        const activityId = await this.findOrCreateActivityId(act.name as string);
-        await this.db.post('/patient_activities', {
+        const activityId = await findOrCreateActivityId(act.name as string);
+        await db.post('/patient_activities', {
           activity_id: activityId,
           patient_id: patientId,
           start_time: toTime(act.start_time as string) ?? '00:00:00',
@@ -603,7 +553,7 @@ class ApiService {
       // last_name is NOT NULL — use '' if empty. contact_no has no format constraint.
       console.log('[API] postSetup: inserting', payload.family_members.length, 'family member(s)');
       if (payload.family_members.length > 0) {
-        await this.db.post(
+        await db.post(
           '/family_member',
           payload.family_members.map((f) => ({
             patient_id: patientId,
@@ -626,7 +576,7 @@ class ApiService {
         const contactName = (contact.name as string) ?? '';
         const [ecFirst, ...ecRest] = contactName.split(' ');
 
-        const { data: [ecRow] } = await this.db.post<Array<{ caregiver_id: number }>>(
+        const { data: [ecRow] } = await db.post<Array<{ caregiver_id: number }>>(
           '/caregiver',
           {
             patient_id: patientId,
@@ -636,7 +586,7 @@ class ApiService {
             role: orNull(contact.relationship),
           },
         );
-        await this.db.post('/caregiver_priority', {
+        await db.post('/caregiver_priority', {
           patient_id: patientId,
           caregiver_id: ecRow.caregiver_id,
           priority_level: priorityMap[contact.priority as string] ?? 5,
@@ -650,25 +600,25 @@ class ApiService {
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         console.error('[API] postSetup: failed —', err.message, '| status =', err.response?.status, '| body =', JSON.stringify(err.response?.data));
-        throw new ApiException(err.message, err.response?.status, err.response?.data);
+        raiseSetupError(err.message, err.response?.status, err.response?.data);
       }
       console.error('[API] postSetup: unexpected error —', err);
-      throw new ApiException(String(err));
+      raiseSetupError(String(err));
     }
   }
 
   // ─── Dashboard GET ────────────────────────────────────────────────────────
 
-  async getPatient(patientId: number): Promise<PatientRow | null> {
+export async function getPatient(patientId: number): Promise<PatientRow | null> {
     try {
-      const { data } = await this.db.get<PatientRow[]>(
+      const { data } = await db.get<PatientRow[]>(
         `/patients?patient_id=eq.${patientId}&select=*`,
       );
       return data[0] ?? null;
     } catch { return null; }
   }
 
-  async editPatient(patientId: number, updates: {
+export async function editPatient(patientId: number, updates: {
     firstName?: string;
     lastName?: string;
     gender?: string;
@@ -685,12 +635,12 @@ class ApiService {
     if (updates.address !== undefined) body.address = orNull(updates.address);
     if (updates.contactNo !== undefined) body.contact_no = orNull(updates.contactNo);
     if (updates.diagnosisStage !== undefined) body.diagnosis_stage = updates.diagnosisStage;
-    await this.db.patch(`/patients?patient_id=eq.${patientId}`, body);
+    await db.patch(`/patients?patient_id=eq.${patientId}`, body);
   }
 
-  async getPatientMedications(patientId: number): Promise<MedDisplay[]> {
+export async function getPatientMedications(patientId: number): Promise<MedDisplay[]> {
     try {
-      const { data } = await this.db.get<PatientMedRow[]>(
+      const { data } = await db.get<PatientMedRow[]>(
         `/patient_medications?patient_id=eq.${patientId}&select=*,medication(*)`,
       );
       return data.map((r) => ({
@@ -704,9 +654,9 @@ class ApiService {
     } catch { return []; }
   }
 
-  async getPatientMeals(patientId: number): Promise<MealDisplay[]> {
+export async function getPatientMeals(patientId: number): Promise<MealDisplay[]> {
     try {
-      const { data } = await this.db.get<PatientMealRow[]>(
+      const { data } = await db.get<PatientMealRow[]>(
         `/patient_meals?patient_id=eq.${patientId}&select=*,meals(*)`,
       );
       return data.map((r) => ({
@@ -718,9 +668,9 @@ class ApiService {
     } catch { return []; }
   }
 
-  async getPatientActivities(patientId: number): Promise<ActivityDisplay[]> {
+export async function getPatientActivities(patientId: number): Promise<ActivityDisplay[]> {
     try {
-      const { data } = await this.db.get<PatientActivityRow[]>(
+      const { data } = await db.get<PatientActivityRow[]>(
         `/patient_activities?patient_id=eq.${patientId}&select=*,activity(*)`,
       );
       return data.map((r) => ({
@@ -734,9 +684,9 @@ class ApiService {
     } catch { return []; }
   }
 
-  async getFamilyMembers(patientId: number): Promise<FamilyDisplay[]> {
+export async function getFamilyMembers(patientId: number): Promise<FamilyDisplay[]> {
     try {
-      const { data } = await this.db.get<FamilyRow[]>(
+      const { data } = await db.get<FamilyRow[]>(
         `/family_member?patient_id=eq.${patientId}&select=*`,
       );
       return data.map((r) => ({
@@ -751,12 +701,12 @@ class ApiService {
 
   // ─── Dashboard ADD ────────────────────────────────────────────────────────
 
-  async addMedication(
+export async function addMedication(
     patientId: number,
     name: string, dosage: string, time: string, notes: string,
   ): Promise<void> {
-    const medicationId = await this.findOrCreateMedicationId(name, notes);
-    await this.db.post('/patient_medications', {
+    const medicationId = await findOrCreateMedicationId(name, notes);
+    await db.post('/patient_medications', {
       medication_id: medicationId,
       patient_id: patientId,
       medication_time: toTime(time) ?? '00:00:00',
@@ -764,21 +714,21 @@ class ApiService {
     });
   }
 
-  async addMeal(patientId: number, mealName: string, mealTime: string): Promise<void> {
-    const mealId = await this.findOrCreateMealId(mealName);
-    await this.db.post('/patient_meals', {
+export async function addMeal(patientId: number, mealName: string, mealTime: string): Promise<void> {
+    const mealId = await findOrCreateMealId(mealName);
+    await db.post('/patient_meals', {
       meal_id: mealId,
       patient_id: patientId,
       meal_time: toTime(mealTime) ?? '00:00:00',
     });
   }
 
-  async addActivity(
+export async function addActivity(
     patientId: number,
     name: string, startTime: string, endTime: string, description: string,
   ): Promise<void> {
-    const activityId = await this.findOrCreateActivityId(name);
-    await this.db.post('/patient_activities', {
+    const activityId = await findOrCreateActivityId(name);
+    await db.post('/patient_activities', {
       activity_id: activityId,
       patient_id: patientId,
       start_time: toTime(startTime) ?? '00:00:00',
@@ -789,46 +739,46 @@ class ApiService {
 
   // ─── Dashboard DELETE ─────────────────────────────────────────────────────
 
-  async deleteMedication(patientMedicationId: number, _medicationId: number): Promise<void> {
-    await this.db.delete(`/patient_medications?patient_medications_id=eq.${patientMedicationId}`);
+export async function deleteMedication(patientMedicationId: number, _medicationId: number): Promise<void> {
+    await db.delete(`/patient_medications?patient_medications_id=eq.${patientMedicationId}`);
   }
 
-  async deleteMeal(patientMealId: number, _mealId: number): Promise<void> {
-    await this.db.delete(`/patient_meals?patient_meal_id=eq.${patientMealId}`);
+export async function deleteMeal(patientMealId: number, _mealId: number): Promise<void> {
+    await db.delete(`/patient_meals?patient_meal_id=eq.${patientMealId}`);
   }
 
-  async deleteActivity(patientActivityId: number, _activityId: number): Promise<void> {
-    await this.db.delete(`/patient_activities?patient_activity_id=eq.${patientActivityId}`);
+export async function deleteActivity(patientActivityId: number, _activityId: number): Promise<void> {
+    await db.delete(`/patient_activities?patient_activity_id=eq.${patientActivityId}`);
   }
 
   // ─── Dashboard EDIT ───────────────────────────────────────────────────────
 
-  async editMedication(
+export async function editMedication(
     patientMedicationId: number, _medicationId: number,
     name: string, dosage: string, time: string, notes: string,
   ): Promise<void> {
-    const medicationId = await this.findOrCreateMedicationId(name, notes);
-    await this.db.patch(`/patient_medications?patient_medications_id=eq.${patientMedicationId}`, {
+    const medicationId = await findOrCreateMedicationId(name, notes);
+    await db.patch(`/patient_medications?patient_medications_id=eq.${patientMedicationId}`, {
       medication_id: medicationId,
       medication_time: toTime(time) ?? '00:00:00',
       dosage: orNull(dosage),
     });
   }
 
-  async editMeal(patientMealId: number, _mealId: number, mealName: string, mealTime: string): Promise<void> {
-    const mealId = await this.findOrCreateMealId(mealName);
-    await this.db.patch(`/patient_meals?patient_meal_id=eq.${patientMealId}`, {
+export async function editMeal(patientMealId: number, _mealId: number, mealName: string, mealTime: string): Promise<void> {
+    const mealId = await findOrCreateMealId(mealName);
+    await db.patch(`/patient_meals?patient_meal_id=eq.${patientMealId}`, {
       meal_id: mealId,
       meal_time: toTime(mealTime) ?? '00:00:00',
     });
   }
 
-  async editActivity(
+export async function editActivity(
     patientActivityId: number, _activityId: number,
     name: string, startTime: string, endTime: string, description: string,
   ): Promise<void> {
-    const activityId = await this.findOrCreateActivityId(name);
-    await this.db.patch(`/patient_activities?patient_activity_id=eq.${patientActivityId}`, {
+    const activityId = await findOrCreateActivityId(name);
+    await db.patch(`/patient_activities?patient_activity_id=eq.${patientActivityId}`, {
       activity_id: activityId,
       start_time: toTime(startTime) ?? '00:00:00',
       end_time: toTime(endTime),
@@ -838,11 +788,11 @@ class ApiService {
 
   // ─── Family Members ───────────────────────────────────────────────────────
 
-  async addFamilyMember(
+export async function addFamilyMember(
     patientId: number, firstName: string, lastName: string,
     relationship: string, contactNo: string,
   ): Promise<void> {
-    await this.db.post('/family_member', {
+    await db.post('/family_member', {
       patient_id: patientId,
       first_name: firstName,
       last_name: lastName || '',
@@ -851,11 +801,11 @@ class ApiService {
     });
   }
 
-  async editFamilyMember(
+export async function editFamilyMember(
     familyMemberId: number, firstName: string, lastName: string,
     relationship: string, contactNo: string,
   ): Promise<void> {
-    await this.db.patch(`/family_member?family_member_id=eq.${familyMemberId}`, {
+    await db.patch(`/family_member?family_member_id=eq.${familyMemberId}`, {
       first_name: firstName,
       last_name: lastName || '',
       relationship: orNull(relationship),
@@ -863,15 +813,15 @@ class ApiService {
     });
   }
 
-  async deleteFamilyMember(familyMemberId: number): Promise<void> {
-    await this.db.delete(`/family_member?family_member_id=eq.${familyMemberId}`);
+export async function deleteFamilyMember(familyMemberId: number): Promise<void> {
+    await db.delete(`/family_member?family_member_id=eq.${familyMemberId}`);
   }
 
   // ─── Emergency Contacts ───────────────────────────────────────────────────
 
-  async getEmergencyContacts(patientId: number): Promise<EmergencyContactDisplay[]> {
+export async function getEmergencyContacts(patientId: number): Promise<EmergencyContactDisplay[]> {
     try {
-      const { data } = await this.db.get<CaregiverPriorityRow[]>(
+      const { data } = await db.get<CaregiverPriorityRow[]>(
         `/caregiver_priority?patient_id=eq.${patientId}&priority_level=gt.1&select=*,caregiver(*)`,
       );
       return data.map((r) => ({
@@ -885,22 +835,22 @@ class ApiService {
     } catch { return []; }
   }
 
-  async addEmergencyContact(
+export async function addEmergencyContact(
     patientId: number, name: string, phone: string, relationship: string,
   ): Promise<void> {
     const parts = name.trim().split(' ');
-    const { data: [cg] } = await this.db.post<Array<{ caregiver_id: number }>>('/caregiver', {
+    const { data: [cg] } = await db.post<Array<{ caregiver_id: number }>>('/caregiver', {
       patient_id: patientId,
       first_name: parts[0] || '',
       last_name: parts.slice(1).join(' ') || '',
       contact_no: e164OrNull(phone),
       role: orNull(relationship),
     });
-    const { data: existing } = await this.db.get<Array<{ priority_level: number }>>(
+    const { data: existing } = await db.get<Array<{ priority_level: number }>>(
       `/caregiver_priority?patient_id=eq.${patientId}&select=priority_level&order=priority_level.desc&limit=1`,
     );
     const nextPriority = (existing[0]?.priority_level ?? 1) + 1;
-    await this.db.post('/caregiver_priority', {
+    await db.post('/caregiver_priority', {
       patient_id: patientId,
       caregiver_id: cg.caregiver_id,
       priority_level: nextPriority,
@@ -908,11 +858,11 @@ class ApiService {
     });
   }
 
-  async editEmergencyContact(
+export async function editEmergencyContact(
     caregiverId: number, name: string, phone: string, relationship: string,
   ): Promise<void> {
     const parts = name.trim().split(' ');
-    await this.db.patch(`/caregiver?caregiver_id=eq.${caregiverId}`, {
+    await db.patch(`/caregiver?caregiver_id=eq.${caregiverId}`, {
       first_name: parts[0] || '',
       last_name: parts.slice(1).join(' ') || '',
       contact_no: e164OrNull(phone),
@@ -920,31 +870,51 @@ class ApiService {
     });
   }
 
-  async deleteEmergencyContact(caregiverId: number, caregiverPriorityId: number): Promise<void> {
-    await this.db.delete(`/caregiver_priority?caregiver_priority_id=eq.${caregiverPriorityId}`);
-    await this.db.delete(`/caregiver?caregiver_id=eq.${caregiverId}`);
+export async function deleteEmergencyContact(caregiverId: number, caregiverPriorityId: number): Promise<void> {
+    await db.delete(`/caregiver_priority?caregiver_priority_id=eq.${caregiverPriorityId}`);
+    await db.delete(`/caregiver?caregiver_id=eq.${caregiverId}`);
   }
 
-  // ─── Weekly Reports ───────────────────────────────────────────────────────
+// ─── Weekly reports ─────────────────────────────────────────────────────────
 
-  async getWeeklyReports(patientId: number): Promise<WeeklyReportDisplay[]> {
+export async function getWeeklyReports(caregiverId: number, patientId: number): Promise<WeeklyReportDisplay[]> {
     try {
-      const { data } = await this.db.get<WeeklyReportRow[]>(
-        `/weekly_report?patient_id=eq.${patientId}&order=created_at.desc`,
+      const { data } = await db.get<ReportRow[]>(
+        `/report?caregiver_id=eq.${caregiverId}&select=*&order=report_id.desc`,
       );
-      return data.map((r) => ({
-        reportId: r.report_id,
-        weekStart: r.week_start,
-        weekEnd: r.week_end,
-        pdfUrl: r.pdf_url ?? null,
-        createdAt: r.created_at,
-      }));
-    } catch { return []; }
+      console.log('[API] getWeeklyReports: raw rows =', JSON.stringify(data));
+      return data.map((r) => {
+        let title = 'Health Report';
+        let period = '';
+        try {
+          const raw = r.description ?? '{}';
+          const parsed: Record<string, unknown> =
+            typeof raw === 'string' ? JSON.parse(raw) : (raw as Record<string, unknown>);
+          title = (parsed.title as string) ?? title;
+          period = (parsed.period as string) ?? '';
+        } catch { /* use defaults */ }
+        return {
+          reportId: r.report_id,
+          caregiverId: r.caregiver_id,
+          reportDate: r.report_date,
+          title,
+          period,
+          pdfUrl: `${getAiAgentBaseUrl()}/reports/${r.report_id}/pdf`,
+        };
+      });
+    } catch (err) {
+      console.error('[API] getWeeklyReports failed:', err);
+      return [];
+    }
   }
 
-  // ─── Auth ─────────────────────────────────────────────────────────────────
+export function getPdfUrl(patientId: number): string {
+  return `${getAiAgentBaseUrl()}/reports/patient/${patientId}/pdf`;
+}
 
-  async getCaregiverByAuthId(authUserId: string): Promise<{
+// ─── Auth ─────────────────────────────────────────────────────────────────
+
+export async function getCaregiverByAuthId(authUserId: string): Promise<{
     caregiverId: number; caregiverName: string; patientId: number; patientName: string;
   } | null> {
     type Row = Array<{
@@ -952,7 +922,7 @@ class ApiService {
       patient_id: number; patients: { first_name: string; last_name: string } | null;
     }>;
     try {
-      const { data } = await this.db.get<Row>(
+      const { data } = await db.get<Row>(
         `/caregiver?auth_user_id=eq.${authUserId}&role=eq.Primary%20Caregiver&select=caregiver_id,first_name,last_name,patient_id,patients(first_name,last_name)`,
       );
       if (!data[0]) return null;
@@ -968,11 +938,11 @@ class ApiService {
     } catch { return null; }
   }
 
-  async getPatientByAuthId(authUserId: string): Promise<{
+export async function getPatientByAuthId(authUserId: string): Promise<{
     patientId: number; patientName: string;
   } | null> {
     try {
-      const { data } = await this.db.get<Array<{
+      const { data } = await db.get<Array<{
         patient_id: number; first_name: string; last_name: string;
       }>>(`/patients?auth_user_id=eq.${authUserId}&select=patient_id,first_name,last_name`);
       if (!data[0]) return null;
@@ -983,7 +953,7 @@ class ApiService {
     } catch { return null; }
   }
 
-  async signIn(email: string, password: string): Promise<{
+export async function signIn(email: string, password: string): Promise<{
     caregiverId: number;
     caregiverName: string;
     patientId: number;
@@ -1019,7 +989,7 @@ class ApiService {
     console.log('[API] signIn: auth succeeded, user_id =', authData.user.id);
 
     try {
-      const { data } = await this.db.get<CaregiverRow>(
+      const { data } = await db.get<CaregiverRow>(
         `/caregiver?auth_user_id=eq.${authData.user.id}&role=eq.Primary%20Caregiver&select=caregiver_id,first_name,last_name,patient_id,patients(first_name,last_name)`,
       );
       if (data[0]) {
@@ -1034,7 +1004,7 @@ class ApiService {
     return null;
   }
 
-  async signInPatient(username: string, pin: string): Promise<{
+export async function signInPatient(username: string, pin: string): Promise<{
     patientId: number;
     patientName: string;
   } | null> {
@@ -1052,7 +1022,7 @@ class ApiService {
     console.log('[API] signInPatient: auth succeeded, user_id =', authData.user.id);
 
     try {
-      const { data } = await this.db.get<Array<{
+      const { data } = await db.get<Array<{
         patient_id: number;
         first_name: string;
         last_name: string;
@@ -1074,7 +1044,6 @@ class ApiService {
     }
   }
 
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1121,5 +1090,39 @@ function toTime(value: string | undefined | null): string | null {
   return null;
 }
 
-export const apiService = new ApiService();
+export const apiService = {
+  pingBackend,
+  sendChatMessage,
+  sendVoiceRecording,
+  postSetup,
+  getPatient,
+  editPatient,
+  getPatientMedications,
+  getPatientMeals,
+  getPatientActivities,
+  getFamilyMembers,
+  addMedication,
+  addMeal,
+  addActivity,
+  deleteMedication,
+  deleteMeal,
+  deleteActivity,
+  editMedication,
+  editMeal,
+  editActivity,
+  addFamilyMember,
+  editFamilyMember,
+  deleteFamilyMember,
+  getEmergencyContacts,
+  addEmergencyContact,
+  editEmergencyContact,
+  deleteEmergencyContact,
+  getWeeklyReports,
+  getPdfUrl,
+  getCaregiverByAuthId,
+  getPatientByAuthId,
+  signIn,
+  signInPatient,
+};
+
 export default apiService;

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,12 @@ import PatientGreeting from '../components/patient/PatientGreeting';
 import DailySummary from '../components/patient/DailySummary';
 import ChatBottomBar from '../components/patient/ChatBottomBar';
 import PatientChatSheet from '../components/patient/PatientChatSheet';
+import ReminderModal from '../components/patient/ReminderModal';
+import { getRagBaseUrl } from '../services/backendUrls';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
+import { supabase } from '../services/supabaseClient';
 
 // WAV / Linear PCM recording options.
 // Raw numeric/string values used to avoid enum import issues across expo-av versions.
@@ -73,6 +79,7 @@ export default function PatientHomeScreen() {
   const [responseAudioUri, setResponseAudioUri] = useState('');
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [reminder, setReminder] = useState<{ message: string; reminderId: string | null } | null>(null);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -82,6 +89,63 @@ export default function PatientHomeScreen() {
   React.useEffect(() => {
     return () => { soundRef.current?.unloadAsync(); };
   }, []);
+
+  const handleReminderReply = async (confirmed: boolean) => {
+    setReminder(null);
+    await fetch(`${getRagBaseUrl()}/agent/reminder-reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patient_id: patientId, confirmed }),
+    });
+  };
+
+  useEffect(() => {
+    if (reminder) return;
+    const interval = setInterval(async () => {
+      try {
+        const url = `${getRagBaseUrl()}/agent/reminders/pending?patient_id=${encodeURIComponent(String(patientId))}`;
+        console.log('[Poll] hitting:', url);
+        const res = await fetch(url);
+        const data = await res.json();
+        console.log('[Poll] response:', JSON.stringify(data));
+        if (data.has_reminder && data.message) {
+          setReminder({ message: data.message, reminderId: null });
+        }
+      } catch (e) {
+        console.log('[Poll] error:', e);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [reminder, patientId]);
+
+  // Register push token; foreground delivery (app already open).
+  useEffect(() => {
+    if (Device.isDevice) {
+      Notifications.requestPermissionsAsync().then(({ status }) => {
+        console.log('[PushToken] permission status:', status);
+        if (status === 'granted') {
+          const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+          console.log('[PushToken] projectId:', projectId);
+          Notifications.getExpoPushTokenAsync({ projectId }).then(tokenData => {
+            console.log('[PushToken] token:', tokenData.data);
+            supabase.from('patients').update({ push_token: tokenData.data }).eq('patient_id', patientId)
+              .then(({ error }) => console.log('[PushToken] saved to db, error:', error));
+          }).catch(err => console.log('[PushToken] getExpoPushTokenAsync error:', err));
+        }
+      }).catch(err => console.log('[PushToken] requestPermissions error:', err));
+    } else {
+      console.log('[PushToken] not a physical device, skipping');
+    }
+
+    const foreground = Notifications.addNotificationReceivedListener((notification) => {
+      const message = notification.request.content.body;
+      if (message) setReminder({ message, reminderId: null });
+    });
+
+    return () => {
+      foreground.remove();
+    };
+  }, [patientId]);
 
   const greeting = getGreeting();
 
@@ -160,6 +224,7 @@ export default function PatientHomeScreen() {
       const result = await apiService.sendVoiceRecording(patientId, uri);
       setResponseText(result.replyText);
       setResponseAudioUri(result.audioUri);
+      console.log('responseAudioUri', result);
       await playResponse(result.audioUri);
     } catch (err) {
       setVoiceError('Voice message failed. Please try again.');
@@ -191,6 +256,13 @@ export default function PatientHomeScreen() {
       colors={['#F5F0FF', '#FFFFFF', '#EDE8F8']}
       style={[styles.container, { paddingTop: insets.top }]}
     >
+      {reminder && (
+        <ReminderModal
+          message={reminder.message}
+          onYes={() => handleReminderReply(true)}
+          onNo={() => handleReminderReply(false)}
+        />
+      )}
       {/* ── Top Bar ── */}
       <View style={styles.topBar}>
         {/* CogniCare pill */}
@@ -206,10 +278,6 @@ export default function PatientHomeScreen() {
 
         <View style={{ flex: 1 }} />
 
-        {/* Settings button */}
-        <TouchableOpacity style={styles.settingsBtn}>
-          <MaterialCommunityIcons name="cog-outline" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
       </View>
 
       {/* ── Main content ── */}
@@ -337,14 +405,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.bold,
     color: colors.textPrimary,
-  },
-  settingsBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: withAlpha(colors.textMuted, 0.12),
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   scrollContent: {
     alignItems: 'center',

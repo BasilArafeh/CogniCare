@@ -5,6 +5,7 @@ Meal reminders: APScheduler cron hooks; rows from ``patient_meals`` / ``meals.me
 from __future__ import annotations
 
 import logging
+from datetime import tzinfo
 
 from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -31,7 +32,7 @@ def fire_meal_reminder(patient_id: str, meal_label: str | None, schedule_row_id:
     )
 
 
-def register_meal_jobs(scheduler: BaseScheduler, scheduler_tz: str) -> None:
+def register_meal_jobs(scheduler: BaseScheduler, scheduler_tz: tzinfo) -> None:
     for row in select_meal_schedule_rows():
         rid = row.get("patient_meal_id")
         pid = str(row.get("patient_id") or "").strip()

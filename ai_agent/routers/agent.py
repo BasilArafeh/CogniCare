@@ -6,12 +6,12 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from memory.memory_manager import save_interaction
 from orchestration.agent_executor import run_agent
 from orchestration.orchestrator import orchestrate_message
-from scheduler.reminder_delivery import acknowledge_patient_message
+from scheduler.reminder_delivery import _pending_by_patient, acknowledge_patient_message
 from schemas.agent_schemas import (
     AgentResponse,
     ChatMessageRequest,
@@ -50,12 +50,22 @@ async def agent_voice(req: VoiceMessageRequest) -> AgentResponse:
 
 @router.post("/chat", response_model=AgentResponse)
 async def agent_chat(req: ChatMessageRequest) -> AgentResponse:
-    logger.info("POST /agent/chat hit | patient_id=%s | language=%s | message=%s", req.patient_id, req.language, req.message)
+    detected_language = req.language or "en"
+    if any("\u0600" <= c <= "\u06ff" for c in req.message):
+        detected_language = "ar"
+
+    logger.info(
+        "POST /agent/chat hit | patient_id=%s | language=%s | detected=%s | message=%s",
+        req.patient_id,
+        req.language,
+        detected_language,
+        req.message,
+    )
     try:
         return await orchestrate_message(
             patient_id=_normalize_patient_id(req.patient_id),
             message=req.message,
-            language=req.language,
+            language=detected_language,
             run_agent=run_agent,
         )
     except Exception:
@@ -63,23 +73,35 @@ async def agent_chat(req: ChatMessageRequest) -> AgentResponse:
         raise HTTPException(status_code=500, detail="Internal server error.") from None
 
 
+@router.get("/reminders/pending")
+async def agent_reminders_pending(patient_id: int = Query(...)) -> dict:
+    pid = str(patient_id)
+    if pid in _pending_by_patient:
+        pending = _pending_by_patient[pid]
+        return {"has_reminder": True, "message": pending.message}
+    return {"has_reminder": False, "message": None}
+
+
 @router.post("/reminder-reply", response_model=AgentResponse)
 async def agent_reminder_reply(req: ReminderReplyRequest) -> AgentResponse:
+    pid = str(req.patient_id)
     try:
-        ack = acknowledge_patient_message(req.patient_id)
+        ack = None
+        if req.confirmed:
+            ack = acknowledge_patient_message(pid)
 
         ts = datetime.now(timezone.utc).isoformat()
         user_payload = {
             "event": "reminder_reply",
-            "patient_id": req.patient_id,
-            "reminder_type": req.reminder_type,
-            "item_label": req.item_label,
+            "patient_id": pid,
+            "reminder_type": ack.reminder_type if ack else None,
+            "item_label": ack.item_label if ack else None,
             "confirmed": req.confirmed,
             "timestamp": ts,
             "scheduler_reminder_id": ack.reminder_id if ack else None,
         }
         save_interaction(
-            patient_id=req.patient_id,
+            patient_id=pid,
             user_text=json.dumps(user_payload, ensure_ascii=False),
             assistant_text=_REMINDER_REPLY_CONFIRMATION,
             detected_intent="REMINDER_RESPONDED",
@@ -88,10 +110,10 @@ async def agent_reminder_reply(req: ReminderReplyRequest) -> AgentResponse:
 
         return AgentResponse(
             response=_REMINDER_REPLY_CONFIRMATION,
-            patient_id=req.patient_id,
+            patient_id=pid,
         )
     except Exception:
-        logger.exception("POST /agent/reminder-reply failed patient_id=%s", req.patient_id)
+        logger.exception("POST /agent/reminder-reply failed patient_id=%s", pid)
         raise HTTPException(status_code=500, detail="Internal server error.") from None
 
 

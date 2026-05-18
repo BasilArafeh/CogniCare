@@ -44,6 +44,10 @@ Examples:
 - "Do I have any appointments today?"
 - "What time is my next dose?"
 - "Did I take my pill this morning?"
+- "Where do I live?"
+- "What is my address?"
+- "وين أسكن؟"
+- "ما عنواني؟"
 
 
 RAG — Knowledge Retrieval
@@ -76,11 +80,18 @@ Examples:
 LLM — Conversational
 Use when the patient message is general conversation that requires
 no data retrieval whatsoever.
+Also use LLM when the patient asks about the conversation itself — what was just said,
+what was discussed, or asks the agent to repeat itself. These are answered from
+conversation history, not the database.
 Examples:
 - "Good morning"
 - "I feel lonely today"
 - "Can you tell me a story?"
 - "I don't remember where I am" (cognitive disorientation with no distress signals)
+- "What did you just tell me?"
+- "I forgot what you said"
+- "Can you say that again?"
+- "What were we talking about?"
 
 
 CLARIFY — Clarification Needed
@@ -141,10 +152,30 @@ For every patient-specific query include a predicate like:
 Use single SELECT statements only. Do not reference interaction_log,
  or long_term_memory.
 
+- meal_time, medication_time, start_time, end_time are TIME columns (time without time zone).
+  They store only a clock time (e.g. 08:30), NOT a date. There is no date component.
+  NEVER cast them with ::date, ::timestamp, DATE(), or compare with CURRENT_DATE —
+  these will always fail with a type error.
+  When the patient asks about "today", just SELECT all rows for that patient without
+  any date filter — the schedule IS their daily routine.
+  To filter by time range use direct TIME comparison only:
+  WHERE start_time >= '08:00' AND start_time <= '12:00'
+
+- UNION rules: every SELECT in a UNION must have the exact same number of columns.
+  When combining different tables with UNION, pad missing columns with NULL and use
+  consistent aliases so columns align. Example combining activities and meals:
+  SELECT activity_type AS name, start_time AS time, 'activity' AS kind
+  FROM patient_activities JOIN activity ON patient_activities.activity_id = activity.activity_id
+  WHERE patient_id = {patient_id}
+  UNION ALL
+  SELECT meal_type AS name, meal_time AS time, 'meal' AS kind
+  FROM patient_meals JOIN meals ON patient_meals.meal_id = meals.meal_id
+  WHERE patient_id = {patient_id}
+
 --------------------------------------------------
 patients
 --------------------------------------------------
-patient_id, first_name, last_name
+patient_id, first_name, last_name, address, diagnosis_stage, dob
 
 
 --------------------------------------------------
@@ -161,9 +192,16 @@ personal memory only.
 --------------------------------------------------
 caregiver
 --------------------------------------------------
-caregiver_id, patient_id, first_name, last_name, contact_no, role
-Note: To filter by patient, join through caregiver_priority (caregiver_id)
-or use family_member as appropriate for the question.
+caregiver_id, first_name, last_name, contact_no, role
+
+IMPORTANT: caregiver has NO patient_id column. Never use WHERE patient_id on this table.
+To get a patient's caregiver, always join through caregiver_priority:
+  SELECT c.first_name, c.last_name, c.contact_no
+  FROM caregiver c
+  JOIN caregiver_priority cp ON c.caregiver_id = cp.caregiver_id
+  WHERE cp.patient_id = {patient_id}
+  ORDER BY cp.priority_level ASC
+  LIMIT 1
 
 
 --------------------------------------------------
@@ -193,7 +231,6 @@ meals
 --------------------------------------------------
 meal_id, meal_type
 
-
 --------------------------------------------------
 activity
 --------------------------------------------------
@@ -206,11 +243,19 @@ patient_medications
 patient_medications_id, medication_id, patient_id,
 medication_time, dosage
 
+Note: medication_name is in the medication table.
+      To get medication names JOIN with medication:
+      JOIN medication ON patient_medications.medication_id = medication.medication_id
+
 
 --------------------------------------------------
 patient_meals
 --------------------------------------------------
 patient_meal_id, meal_id, patient_id, meal_time
+
+Note: meal_type is in the meals table.
+      To get meal names JOIN with meals:
+      JOIN meals ON patient_meals.meal_id = meals.meal_id
 
 
 --------------------------------------------------
@@ -218,6 +263,10 @@ patient_activities
 --------------------------------------------------
 patient_activity_id, activity_id, patient_id,
 start_time, end_time, description
+
+Note: activity_type is in the activity table.
+      To get activity names JOIN with activity:
+      JOIN activity ON patient_activities.activity_id = activity.activity_id
 
 
 --------------------------------------------------

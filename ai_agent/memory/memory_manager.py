@@ -135,6 +135,63 @@ def load_full_memory(patient_id: str) -> dict[str, Any]:
         return {"history": [], "profile": {}}
 
 
+def _coerce_single_row(data: Any) -> dict[str, Any]:
+    if data is None:
+        return {}
+    if isinstance(data, list):
+        return data[0] if data else {}
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+# Fast path for per-turn orchestration: patients row + patient_memory merged.
+def load_patient_profile(patient_id: str) -> dict[str, Any]:
+    if supabase_client is None:
+        logger.warning(
+            "load_patient_profile skipped: Supabase is not configured (patient_id=%s).",
+            patient_id,
+        )
+        return {}
+    try:
+        patient_response = (
+            supabase_client.table("patients")
+            .select("patient_id, first_name, last_name, address, diagnosis_stage")
+            .eq("patient_id", patient_id)
+            .limit(1)
+            .execute()
+        )
+        patient_row = _coerce_single_row(patient_response.data)
+
+        memory_response = (
+            supabase_client.table("patient_memory")
+            .select("*")
+            .eq("patient_id", patient_id)
+            .maybe_single()
+            .execute()
+        )
+        memory_row = _coerce_single_row(memory_response.data)
+
+        profile: dict[str, Any] = {**patient_row, **memory_row}
+        if patient_row.get("first_name"):
+            profile["first_name"] = patient_row["first_name"]
+        elif memory_row.get("preferred_name"):
+            profile["first_name"] = memory_row["preferred_name"]
+        if patient_row.get("diagnosis_stage"):
+            profile["diagnosis_stage"] = patient_row["diagnosis_stage"]
+
+        logger.info(
+            "load_patient_profile: patient_id=%s first_name=%s profile_keys=%s",
+            patient_id,
+            profile.get("first_name"),
+            sorted(profile.keys()),
+        )
+        return profile
+    except Exception:
+        logger.exception("Failed to load patient profile for patient_id=%s", patient_id)
+        return {}
+
+
 # Writes one completed user message + assistant reply to interaction_log after a turn finishes.
 def save_interaction(
     patient_id: str,

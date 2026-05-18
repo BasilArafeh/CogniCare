@@ -1,9 +1,13 @@
 import html
 import json
+import logging
+import math
 import os
 import re
 import uuid
 from collections import Counter
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -43,6 +47,7 @@ os.makedirs(REPORTS_DIR, exist_ok=True)
 
 OPENAI_REPORT_MODEL = os.getenv("OPENAI_REPORT_MODEL", "gpt-5.5")
 REPORT_WINDOW_DAYS = int(os.getenv("REPORT_WINDOW_DAYS", "5"))
+STORAGE_BUCKET = os.getenv("REPORTS_STORAGE_BUCKET", "reports")
 
 _TECHNICAL_FAILURE_PATTERNS = [
     "agent stopped",
@@ -222,18 +227,38 @@ _MEANINGFUL_KEYWORDS = re.compile(
 )
 
 
-def group_repeated_questions(interactions: list) -> list:
-    questions = []
-    for row in interactions:
-        t = str(pick_first(row, ("user_text", "interaction_text", "message"), "") or "").strip()
-        if len(t) < 6 or len(t) > 500:
-            continue
-        if _TRIVIAL_PATTERNS.match(t):
-            continue
-        if not _MEANINGFUL_KEYWORDS.search(t):
-            continue
-        questions.append(t)
+def _cosine(a: list, b: list) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(x * x for x in b))
+    return dot / (na * nb) if na and nb else 0.0
 
+
+def _group_by_embeddings(questions: list, threshold: float = 0.85) -> list:
+    client = OpenAI()
+    resp = client.embeddings.create(model="text-embedding-3-small", input=questions)
+    vectors = [e.embedding for e in resp.data]
+
+    clusters: list[tuple[str, list[int]]] = []
+    for i, vec in enumerate(vectors):
+        placed = False
+        for rep_text, indices in clusters:
+            if _cosine(vec, vectors[indices[0]]) >= threshold:
+                indices.append(i)
+                placed = True
+                break
+        if not placed:
+            clusters.append((questions[i], [i]))
+
+    result = [
+        {"text": rep, "count": len(indices)}
+        for rep, indices in clusters
+        if len(indices) >= 2
+    ]
+    return sorted(result, key=lambda x: x["count"], reverse=True)
+
+
+def _group_by_exact(questions: list) -> list:
     def norm(t: str) -> str:
         return re.sub(r"[^a-z0-9\s]", "", t.lower().strip())
 
@@ -245,6 +270,32 @@ def group_repeated_questions(interactions: list) -> list:
             seen.add(n)
             result.append({"text": q, "count": counts[n]})
     return sorted(result, key=lambda x: x["count"], reverse=True)
+
+
+def group_repeated_questions(interactions: list) -> list:
+    questions = []
+    for row in interactions:
+        t = str(pick_first(row, ("user_text", "interaction_text", "message"), "") or "").strip()
+        if len(t) < 6 or len(t) > 500:
+            continue
+        if t.startswith("["):
+            continue
+        if _TRIVIAL_PATTERNS.match(t):
+            continue
+        if not _MEANINGFUL_KEYWORDS.search(t):
+            continue
+        questions.append(t)
+
+    if not questions:
+        return []
+
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            return _group_by_embeddings(questions)
+        except Exception:
+            pass
+
+    return _group_by_exact(questions)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -993,6 +1044,69 @@ def _build_repeated_questions_section(repeated_questions: list, styles: dict) ->
 # Main PDF builder — public API (called by routers/reports.py)
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _upload_pdf_to_storage(file_path: str, file_name: str) -> str | None:
+    """Upload generated PDF to Supabase Storage and return its public URL."""
+    try:
+        client = get_supabase_client()
+        with open(file_path, "rb") as f:
+            file_bytes = f.read()
+        client.storage.from_(STORAGE_BUCKET).upload(
+            path=file_name,
+            file=file_bytes,
+            file_options={"content-type": "application/pdf", "upsert": "true"},
+        )
+        url = client.storage.from_(STORAGE_BUCKET).get_public_url(file_name)
+        logger.info("PDF uploaded to Supabase Storage: %s", url)
+        return url
+    except Exception:
+        logger.exception("Failed to upload PDF to Supabase Storage bucket=%s", STORAGE_BUCKET)
+        return None
+
+
+def _save_report_to_db(patient_id: int, patient_name: str, file_name: str, days: int, storage_url: str | None = None) -> None:
+    """Insert a row into the report table after PDF generation. Non-fatal on error."""
+    try:
+        client = get_supabase_client()
+        cg = (
+            client.table("caregiver")
+            .select("caregiver_id")
+            .eq("patient_id", patient_id)
+            .eq("role", "Primary Caregiver")
+            .limit(1)
+            .execute()
+        )
+        if not cg.data:
+            cg = (
+                client.table("caregiver")
+                .select("caregiver_id")
+                .eq("patient_id", patient_id)
+                .limit(1)
+                .execute()
+            )
+        if not cg.data:
+            return
+        caregiver_id = cg.data[0]["caregiver_id"]
+        today = datetime.now()
+        date_from = today - timedelta(days=days)
+        period = (
+            f"{date_from.strftime('%B')} {date_from.day}, {date_from.year}"
+            f" – {today.strftime('%B')} {today.day}, {today.year}"
+        )
+        description = json.dumps({
+            "title": f"{days}-day health report for {patient_name}",
+            "period": period,
+            "file_name": file_name,
+            "storage_url": storage_url or "",
+        })
+        client.table("report").insert({
+            "caregiver_id": caregiver_id,
+            "report_date": today.date().isoformat(),
+            "description": description,
+        }).execute()
+    except Exception:
+        pass
+
+
 def build_patient_report_pdf(patient_id: int, days: int = REPORT_WINDOW_DAYS) -> str:
     global _PW
     _ensure_reportlab_installed()
@@ -1090,27 +1204,20 @@ def build_patient_report_pdf(patient_id: int, days: int = REPORT_WINDOW_DAYS) ->
         subtitle="Activities scheduled during this period with confirmation status.",
     )
 
-    story.append(PageBreak())
-
-    # 10 — Conversation highlights (dialogue cards)
-    story += _build_conversation_highlights_section(interactions, styles)
-
-    # 11 — Repeated questions (only when patterns exist)
+    # Repeated questions (only when patterns exist)
     if repeated_questions:
-        story.append(Spacer(1, 0.3 * cm))
+        story.append(PageBreak())
         story += _build_repeated_questions_section(repeated_questions, styles)
 
     doc.build(story, onFirstPage=_add_footer, onLaterPages=_add_footer)
+    storage_url = _upload_pdf_to_storage(file_path, file_name)
+    _save_report_to_db(patient_id, patient_name, file_name, days, storage_url=storage_url)
     return file_path
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Metadata / file helpers — called by routers/reports.py
+# File helpers — called by routers/reports.py
 # ──────────────────────────────────────────────────────────────────────────────
-
-def build_report_metadata(file_path: str) -> dict:
-    return {"file_name": os.path.basename(file_path), "file_type": "application/pdf"}
-
 
 def get_report_file_path(file_name: str) -> str:
     safe_name = os.path.basename(file_name)
@@ -1118,3 +1225,34 @@ def get_report_file_path(file_name: str) -> str:
     if not os.path.exists(file_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report file not found")
     return file_path
+
+
+def get_latest_patient_report_file_path(patient_id: int) -> str:
+    client = get_supabase_client()
+    cg = (
+        client.table("caregiver")
+        .select("caregiver_id")
+        .eq("patient_id", patient_id)
+        .limit(1)
+        .execute()
+    )
+    if not cg.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No caregiver found for patient")
+    caregiver_id = cg.data[0]["caregiver_id"]
+    result = (
+        client.table("report")
+        .select("description")
+        .eq("caregiver_id", caregiver_id)
+        .order("report_date", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No reports found for patient")
+    desc = result.data[0]["description"]
+    if isinstance(desc, str):
+        desc = json.loads(desc)
+    file_name = desc.get("file_name")
+    if not file_name:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report file name not found in description")
+    return get_report_file_path(file_name)

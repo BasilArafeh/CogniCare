@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import tzinfo
 
+import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -27,6 +29,11 @@ _reload_job_id = "cognicare:meta:reload_schedules"
 _scheduler_singleton: BackgroundScheduler | None = None
 
 
+def _scheduler_timezone_name_and_tz() -> tuple[str, tzinfo]:
+    tz_name = (os.getenv("SCHEDULER_TIMEZONE") or "Asia/Amman").strip()
+    return tz_name, pytz.timezone(tz_name)
+
+
 # Drops DB-backed jobs before re-reading Supabase/PG via REST clients.
 def _remove_dynamic_jobs(scheduler: BackgroundScheduler) -> None:
     for job in scheduler.get_jobs():
@@ -37,12 +44,12 @@ def _remove_dynamic_jobs(scheduler: BackgroundScheduler) -> None:
 
 # Rebuilds meds/meals/activity cron fires from Postgres (Supabase).
 def reload_schedule_jobs(scheduler: BackgroundScheduler) -> None:
-    timezone_str = (os.getenv("SCHEDULER_TIMEZONE") or "UTC").strip()
+    _, sched_tz = _scheduler_timezone_name_and_tz()
 
     _remove_dynamic_jobs(scheduler)
-    register_medication_jobs(scheduler, timezone_str)
-    register_meal_jobs(scheduler, timezone_str)
-    register_activity_jobs(scheduler, timezone_str)
+    register_medication_jobs(scheduler, sched_tz)
+    register_meal_jobs(scheduler, sched_tz)
+    register_activity_jobs(scheduler, sched_tz)
     logger.info(
         "[scheduler] Dynamic jobs refreshed total_jobs=%s",
         len(scheduler.get_jobs()),
@@ -54,8 +61,8 @@ def start_scheduler() -> BackgroundScheduler:
     global _scheduler_singleton
     enabled = os.getenv("COGNICARE_SCHEDULER_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
 
-    timezone_str = (os.getenv("SCHEDULER_TIMEZONE") or "UTC").strip()
-    scheduler = BackgroundScheduler(timezone=timezone_str)
+    timezone_str, sched_tz = _scheduler_timezone_name_and_tz()
+    scheduler = BackgroundScheduler(timezone=sched_tz)
     if not enabled:
         logger.info("[scheduler] Disabled via COGNICARE_SCHEDULER_ENABLED")
         scheduler.start(paused=True)
