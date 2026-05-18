@@ -1,6 +1,7 @@
 import html
 import json
 import logging
+import math
 import os
 import re
 import uuid
@@ -226,6 +227,51 @@ _MEANINGFUL_KEYWORDS = re.compile(
 )
 
 
+def _cosine(a: list, b: list) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(x * x for x in b))
+    return dot / (na * nb) if na and nb else 0.0
+
+
+def _group_by_embeddings(questions: list, threshold: float = 0.85) -> list:
+    client = OpenAI()
+    resp = client.embeddings.create(model="text-embedding-3-small", input=questions)
+    vectors = [e.embedding for e in resp.data]
+
+    clusters: list[tuple[str, list[int]]] = []
+    for i, vec in enumerate(vectors):
+        placed = False
+        for rep_text, indices in clusters:
+            if _cosine(vec, vectors[indices[0]]) >= threshold:
+                indices.append(i)
+                placed = True
+                break
+        if not placed:
+            clusters.append((questions[i], [i]))
+
+    result = [
+        {"text": rep, "count": len(indices)}
+        for rep, indices in clusters
+        if len(indices) >= 2
+    ]
+    return sorted(result, key=lambda x: x["count"], reverse=True)
+
+
+def _group_by_exact(questions: list) -> list:
+    def norm(t: str) -> str:
+        return re.sub(r"[^a-z0-9\s]", "", t.lower().strip())
+
+    normalized = [norm(q) for q in questions]
+    counts = Counter(normalized)
+    result, seen = [], set()
+    for q, n in zip(questions, normalized):
+        if counts[n] >= 2 and n not in seen:
+            seen.add(n)
+            result.append({"text": q, "count": counts[n]})
+    return sorted(result, key=lambda x: x["count"], reverse=True)
+
+
 def group_repeated_questions(interactions: list) -> list:
     questions = []
     for row in interactions:
@@ -240,17 +286,16 @@ def group_repeated_questions(interactions: list) -> list:
             continue
         questions.append(t)
 
-    def norm(t: str) -> str:
-        return re.sub(r"[^a-z0-9\s]", "", t.lower().strip())
+    if not questions:
+        return []
 
-    normalized = [norm(q) for q in questions]
-    counts = Counter(normalized)
-    result, seen = [], set()
-    for q, n in zip(questions, normalized):
-        if counts[n] >= 2 and n not in seen:
-            seen.add(n)
-            result.append({"text": q, "count": counts[n]})
-    return sorted(result, key=lambda x: x["count"], reverse=True)
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            return _group_by_embeddings(questions)
+        except Exception:
+            pass
+
+    return _group_by_exact(questions)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
